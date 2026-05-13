@@ -12,7 +12,8 @@
     h1 { margin: 0; font-size: 22px; }
     .subtitle { color: var(--muted); margin-top: 6px; }
     main { padding: 24px; display: grid; gap: 20px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }
+    .wide { grid-column: 1 / -1; }
     .card { background: var(--card); border: 1px solid #334155; border-radius: 14px; padding: 18px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
     .card h2 { margin-top: 0; font-size: 18px; }
     label { display: block; color: var(--muted); margin: 10px 0 6px; font-size: 13px; }
@@ -21,32 +22,47 @@
     button { cursor: pointer; background: var(--accent); color: #001018; border: 0; padding: 10px 14px; border-radius: 9px; font-weight: 700; margin-top: 12px; }
     button.secondary { background: #334155; color: var(--text); }
     button.ok { background: var(--ok); color: #03210d; }
-    pre { background: #020617; color: #d1d5db; border: 1px solid #334155; border-radius: 10px; padding: 12px; white-space: pre-wrap; overflow:auto; max-height: 420px; }
+    button.danger { background: var(--danger); color: #fff; }
+    pre { background: #020617; color: #d1d5db; border: 1px solid #334155; border-radius: 10px; padding: 12px; white-space: pre-wrap; overflow:auto; max-height: 360px; }
     .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
-    .badge { border-radius: 999px; padding: 4px 9px; background:#334155; color:var(--text); font-size:12px; }
+    .two { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .badge { border-radius: 999px; padding: 4px 9px; background:#334155; color:var(--text); font-size:12px; display:inline-block; }
     .badge.ok { background:#14532d; color:#bbf7d0; }
     .badge.warn { background:#78350f; color:#fde68a; }
-    a { color: var(--accent); }
+    .badge.danger { background:#7f1d1d; color:#fecaca; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    table { width:100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    th, td { border-bottom: 1px solid #334155; padding: 8px; text-align:left; vertical-align: top; }
+    th { color: var(--muted); background:#0b1220; position: sticky; top: 0; }
+    .tableWrap { overflow:auto; max-height: 460px; border:1px solid #334155; border-radius:10px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .hidden { display:none; }
   </style>
 </head>
 <body>
 <header>
   <h1>AI Security Gate</h1>
-  <div class="subtitle">Speckit 文档驱动的 AI 自动化安全评审与威胁建模系统</div>
+  <div class="subtitle">以产品 + 版本 + 工单为核心的 Speckit 文档安全评审系统</div>
 </header>
 <main>
   <section class="grid">
     <div class="card">
       <h2>Dashboard</h2>
       <p><span class="badge ok">Gate1</span> 业务需求安全评审</p>
-      <p><span class="badge warn">Gate2</span> 架构 / API / 代码级安全评审</p>
-      <p>知识库只读用于评审，修改必须通过 Knowledge Base 页面人工保存。</p>
+      <p><span class="badge warn">Gate2</span> 架构 / API / 技术需求安全评审</p>
+      <p class="muted">每次评审都会生成独立工单，按产品名称 + 产品版本分类保存本地报告。</p>
       <button class="secondary" onclick="health()">检查服务状态</button>
       <pre id="healthOut">等待检查...</pre>
     </div>
 
     <div class="card">
       <h2>Gate1 Review</h2>
+      <div class="two">
+        <div><label>Product Name</label><input id="g1ProductName" value="Demo Security Gate Product" /></div>
+        <div><label>Product Version</label><input id="g1ProductVersion" value="v1.0.0" /></div>
+      </div>
       <label>Project ID</label><input id="g1Project" value="demo" />
       <label>Repository</label><input id="g1Repo" value="quy7_roche/AI_Security_Gate" />
       <label>Branch</label><input id="g1Branch" value="main" />
@@ -61,6 +77,10 @@ specs/business-flow.md</textarea>
 
     <div class="card">
       <h2>Gate2 Review</h2>
+      <div class="two">
+        <div><label>Product Name</label><input id="g2ProductName" value="Demo Security Gate Product" /></div>
+        <div><label>Product Version</label><input id="g2ProductVersion" value="v1.0.0" /></div>
+      </div>
       <label>Project ID</label><input id="g2Project" value="demo" />
       <label>Repository</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate" />
       <label>Branch</label><input id="g2Branch" value="main" />
@@ -69,7 +89,7 @@ specs/business-flow.md</textarea>
 specs/api-design.md
 specs/data-model.md
 specs/implementation-plan.md</textarea>
-      <label>Gate1 Report</label><input id="g2Gate1Report" value="reports/Security-Review-Gate1.md" />
+      <label>Gate1 Report（可留空，系统会自动查找同产品 + 版本最新 Gate1 报告）</label><input id="g2Gate1Report" value="" />
       <label>Threshold</label><input id="g2Threshold" type="number" step="0.01" value="0.78" />
       <button onclick="runGate('gate2')">Run Gate2 Review</button>
       <pre id="g2Out">等待运行...</pre>
@@ -77,16 +97,53 @@ specs/implementation-plan.md</textarea>
   </section>
 
   <section class="grid">
-    <div class="card">
-      <h2>Report Center / Approval</h2>
-      <label>Review ID</label><input id="reviewId" placeholder="运行 Gate 后自动填充，也可手动输入" />
+    <div class="card wide">
+      <h2>Work Orders / Reports</h2>
+      <p class="muted">报告不再默认在 UI 中完整展开。请通过工单列表中的“查看 / 下载”链接打开或导出报告；报告文件会按产品 + 版本 + 工单保存到本地 reports 目录。</p>
+      <div class="two">
+        <div><label>Filter Product Name</label><input id="woProductName" value="Demo Security Gate Product" /></div>
+        <div><label>Filter Product Version</label><input id="woProductVersion" value="v1.0.0" /></div>
+      </div>
       <div class="row">
-        <button class="secondary" onclick="loadReport()">View Report</button>
-        <button onclick="saveReport()">Save Edited Report</button>
+        <button class="secondary" onclick="loadWorkOrders()">Load Work Orders</button>
+        <button class="secondary" onclick="clearWorkOrderFilter()">Clear Filter</button>
+      </div>
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Created</th>
+              <th>Product / Version</th>
+              <th>Gate</th>
+              <th>Work Order ID</th>
+              <th>Review ID</th>
+              <th>Status</th>
+              <th>Artifacts</th>
+            </tr>
+          </thead>
+          <tbody id="workOrdersBody"><tr><td colspan="7" class="muted">等待加载...</td></tr></tbody>
+        </table>
+      </div>
+      <pre id="workOrdersOut">等待操作...</pre>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Report Operations / Approval</h2>
+      <label>Review ID</label><input id="reviewId" placeholder="运行 Gate 后自动填充，也可从工单列表复制" />
+      <div class="row">
+        <button class="secondary" onclick="openReport()">Open Report Link</button>
+        <button class="secondary" onclick="downloadReport()">Download Report</button>
+        <button class="secondary" onclick="toggleEditor()">Load for Edit</button>
         <button class="ok" onclick="approveReport()">Approve</button>
       </div>
       <label>Reviewer</label><input id="reviewer" value="security.reviewer@example.com" />
-      <label>Report Content</label><textarea id="reportContent" style="min-height:360px"></textarea>
+      <div id="editorPanel" class="hidden">
+        <label>Report Content（仅在点击 Load for Edit 后加载）</label>
+        <textarea id="reportContent" style="min-height:360px"></textarea>
+        <button onclick="saveReport()">Save Edited Report</button>
+      </div>
       <pre id="reportOut">等待操作...</pre>
     </div>
 
@@ -96,12 +153,13 @@ specs/implementation-plan.md</textarea>
       <select id="kbGate"><option value="gate1">gate1</option><option value="gate2">gate2</option></select>
       <div class="row">
         <button class="secondary" onclick="loadKb()">Load KB</button>
+        <button class="secondary" onclick="loadKbHistory()">Load Change History</button>
         <button onclick="saveKb()">Manual Save KB</button>
       </div>
       <label>Version</label><input id="kbVersion" value="1.0.1" />
       <label>Updated By</label><input id="kbUpdatedBy" value="security.admin@example.com" />
       <label>Change Reason</label><input id="kbReason" value="Manual update from UI" />
-      <label>Knowledge Base JSON</label><textarea id="kbContent" style="min-height:360px"></textarea>
+      <label>Knowledge Base JSON</label><textarea id="kbContent" style="min-height:260px"></textarea>
       <pre id="kbOut">等待操作...</pre>
     </div>
   </section>
@@ -110,50 +168,144 @@ specs/implementation-plan.md</textarea>
   let latestReviewId = '';
   const lines = (id) => document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
   const show = (id, data) => document.getElementById(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   async function health() {
     const res = await fetch('/api/v1/health');
     show('healthOut', await res.json());
   }
 
-  async function runGate(gate) {
+  function requestBody(gate) {
     const prefix = gate === 'gate1' ? 'g1' : 'g2';
     const body = {
       project_id: document.getElementById(prefix + 'Project').value,
+      product_name: document.getElementById(prefix + 'ProductName').value,
+      product_version: document.getElementById(prefix + 'ProductVersion').value,
       repository: document.getElementById(prefix + 'Repo').value,
       branch: document.getElementById(prefix + 'Branch').value,
       documents: lines(prefix + 'Docs'),
       threshold: Number(document.getElementById(prefix + 'Threshold').value),
       triggered_by: 'ui'
     };
-    if (gate === 'gate2') body.gate1_report = document.getElementById('g2Gate1Report').value;
+    if (gate === 'gate2') {
+      const gate1Report = document.getElementById('g2Gate1Report').value.trim();
+      if (gate1Report) body.gate1_report = gate1Report;
+    }
+    return body;
+  }
+
+  async function runGate(gate) {
+    const prefix = gate === 'gate1' ? 'g1' : 'g2';
+    const body = requestBody(gate);
     const res = await fetch(`/api/v1/security-review/${gate}/run`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const data = await res.json();
     latestReviewId = data.review_id || '';
     document.getElementById('reviewId').value = latestReviewId;
-    show(prefix + 'Out', data);
+    document.getElementById('woProductName').value = body.product_name;
+    document.getElementById('woProductVersion').value = body.product_version;
+    const summary = {
+      work_order_id: data.work_order_id,
+      review_id: data.review_id,
+      product_name: data.product_name,
+      product_version: data.product_version,
+      gate: data.gate,
+      status: data.status,
+      matched: data.matched,
+      report_url: data.report_url,
+      report_download_url: data.report_download_url,
+      work_order_url: data.work_order_url,
+      report_path: data.report_path,
+      matched_scenarios: data.matched_scenarios
+    };
+    show(prefix + 'Out', summary);
+    await loadWorkOrders();
   }
 
-  async function loadReport() {
-    const id = document.getElementById('reviewId').value || latestReviewId;
-    const res = await fetch(`/api/v1/reports/${id}`);
+  function clearWorkOrderFilter() {
+    document.getElementById('woProductName').value = '';
+    document.getElementById('woProductVersion').value = '';
+  }
+
+  async function loadWorkOrders() {
+    const product = document.getElementById('woProductName').value.trim();
+    const version = document.getElementById('woProductVersion').value.trim();
+    const params = new URLSearchParams();
+    if (product) params.set('product_name', product);
+    if (version) params.set('product_version', version);
+    const res = await fetch('/api/v1/work-orders' + (params.toString() ? '?' + params.toString() : ''));
+    const data = await res.json();
+    const rows = data.items || [];
+    const body = document.getElementById('workOrdersBody');
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="7" class="muted">暂无工单</td></tr>';
+    } else {
+      body.innerHTML = rows.map(item => `
+        <tr>
+          <td>${esc(item.created_at || '')}</td>
+          <td>${esc(item.product_name)}<br><span class="muted small">${esc(item.product_version)}</span></td>
+          <td><span class="badge ${item.gate === 'gate1' ? 'ok' : 'warn'}">${esc(item.gate)}</span></td>
+          <td><a href="${esc(item.work_order_url)}" target="_blank">${esc(item.work_order_id)}</a></td>
+          <td>${esc(item.review_id)}</td>
+          <td>${esc(item.status)}<br><span class="muted small">approval: ${esc(item.approval_status)}</span></td>
+          <td>
+            <a href="${esc(item.report_url)}" target="_blank">查看报告</a><br>
+            <a href="${esc(item.report_download_url)}" target="_blank">下载报告</a><br>
+            <button class="secondary" onclick="selectReview('${esc(item.review_id)}')">Select</button>
+          </td>
+        </tr>`).join('');
+    }
+    show('workOrdersOut', {count: rows.length, filters: {product_name: product || null, product_version: version || null}});
+  }
+
+  function selectReview(reviewId) {
+    latestReviewId = reviewId;
+    document.getElementById('reviewId').value = reviewId;
+    show('reportOut', `Selected review: ${reviewId}`);
+  }
+
+  function currentReviewId() {
+    return document.getElementById('reviewId').value || latestReviewId;
+  }
+
+  function openReport() {
+    const id = currentReviewId();
+    if (!id) { show('reportOut', 'Please select or input a review_id.'); return; }
+    window.open(`/api/v1/reports/${encodeURIComponent(id)}`, '_blank');
+  }
+
+  function downloadReport() {
+    const id = currentReviewId();
+    if (!id) { show('reportOut', 'Please select or input a review_id.'); return; }
+    window.open(`/api/v1/reports/${encodeURIComponent(id)}/download`, '_blank');
+  }
+
+  async function toggleEditor() {
+    const id = currentReviewId();
+    if (!id) { show('reportOut', 'Please select or input a review_id.'); return; }
+    const panel = document.getElementById('editorPanel');
+    panel.classList.remove('hidden');
+    const res = await fetch(`/api/v1/reports/${encodeURIComponent(id)}`);
     const text = await res.text();
     document.getElementById('reportContent').value = text;
-    show('reportOut', res.ok ? 'Report loaded.' : text);
+    show('reportOut', res.ok ? 'Report loaded for editing.' : text);
   }
 
   async function saveReport() {
-    const id = document.getElementById('reviewId').value || latestReviewId;
+    const id = currentReviewId();
+    if (!id) { show('reportOut', 'Please select or input a review_id.'); return; }
     const body = {content: document.getElementById('reportContent').value, reviewer: document.getElementById('reviewer').value, comment: 'Manual report update from UI'};
-    const res = await fetch(`/api/v1/reports/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const res = await fetch(`/api/v1/reports/${encodeURIComponent(id)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     show('reportOut', await res.json());
+    await loadWorkOrders();
   }
 
   async function approveReport() {
-    const id = document.getElementById('reviewId').value || latestReviewId;
+    const id = currentReviewId();
+    if (!id) { show('reportOut', 'Please select or input a review_id.'); return; }
     const body = {reviewer: document.getElementById('reviewer').value, comment: 'Approved from UI'};
-    const res = await fetch(`/api/v1/reports/${id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const res = await fetch(`/api/v1/reports/${encodeURIComponent(id)}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     show('reportOut', await res.json());
+    await loadWorkOrders();
   }
 
   async function loadKb() {
@@ -162,6 +314,12 @@ specs/implementation-plan.md</textarea>
     const data = await res.json();
     document.getElementById('kbContent').value = JSON.stringify(data, null, 2);
     show('kbOut', 'Knowledge base loaded.');
+  }
+
+  async function loadKbHistory() {
+    const gate = document.getElementById('kbGate').value;
+    const res = await fetch(`/api/v1/knowledge-base/${gate}/history`);
+    show('kbOut', await res.json());
   }
 
   async function saveKb() {
@@ -173,6 +331,8 @@ specs/implementation-plan.md</textarea>
     const res = await fetch(`/api/v1/knowledge-base/${gate}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     show('kbOut', await res.json());
   }
+
+  loadWorkOrders().catch(() => {});
 </script>
 </body>
 </html>

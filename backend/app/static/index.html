@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Security Gate</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --card:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    header { padding: 20px 28px; border-bottom: 1px solid #334155; background: #020617; position: sticky; top:0; z-index:10; }
+    h1 { margin: 0; font-size: 22px; }
+    .subtitle { color: var(--muted); margin-top: 6px; }
+    main { padding: 24px; display: grid; gap: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .card { background: var(--card); border: 1px solid #334155; border-radius: 14px; padding: 18px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+    .card h2 { margin-top: 0; font-size: 18px; }
+    label { display: block; color: var(--muted); margin: 10px 0 6px; font-size: 13px; }
+    input, textarea, select { width: 100%; background: #0b1220; color: var(--text); border: 1px solid #475569; border-radius: 8px; padding: 10px; }
+    textarea { min-height: 86px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    button { cursor: pointer; background: var(--accent); color: #001018; border: 0; padding: 10px 14px; border-radius: 9px; font-weight: 700; margin-top: 12px; }
+    button.secondary { background: #334155; color: var(--text); }
+    button.ok { background: var(--ok); color: #03210d; }
+    pre { background: #020617; color: #d1d5db; border: 1px solid #334155; border-radius: 10px; padding: 12px; white-space: pre-wrap; overflow:auto; max-height: 420px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    .badge { border-radius: 999px; padding: 4px 9px; background:#334155; color:var(--text); font-size:12px; }
+    .badge.ok { background:#14532d; color:#bbf7d0; }
+    .badge.warn { background:#78350f; color:#fde68a; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>AI Security Gate</h1>
+  <div class="subtitle">Speckit 文档驱动的 AI 自动化安全评审与威胁建模系统</div>
+</header>
+<main>
+  <section class="grid">
+    <div class="card">
+      <h2>Dashboard</h2>
+      <p><span class="badge ok">Gate1</span> 业务需求安全评审</p>
+      <p><span class="badge warn">Gate2</span> 架构 / API / 代码级安全评审</p>
+      <p>知识库只读用于评审，修改必须通过 Knowledge Base 页面人工保存。</p>
+      <button class="secondary" onclick="health()">检查服务状态</button>
+      <pre id="healthOut">等待检查...</pre>
+    </div>
+
+    <div class="card">
+      <h2>Gate1 Review</h2>
+      <label>Project ID</label><input id="g1Project" value="demo" />
+      <label>Repository</label><input id="g1Repo" value="quy7_roche/AI_Security_Gate" />
+      <label>Branch</label><input id="g1Branch" value="main" />
+      <label>Documents（每行一个路径）</label>
+      <textarea id="g1Docs">specs/product-requirements.md
+specs/user-stories.md
+specs/business-flow.md</textarea>
+      <label>Threshold</label><input id="g1Threshold" type="number" step="0.01" value="0.78" />
+      <button onclick="runGate('gate1')">Run Gate1 Review</button>
+      <pre id="g1Out">等待运行...</pre>
+    </div>
+
+    <div class="card">
+      <h2>Gate2 Review</h2>
+      <label>Project ID</label><input id="g2Project" value="demo" />
+      <label>Repository</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate" />
+      <label>Branch</label><input id="g2Branch" value="main" />
+      <label>Documents（每行一个路径）</label>
+      <textarea id="g2Docs">specs/architecture.md
+specs/api-design.md
+specs/data-model.md
+specs/implementation-plan.md</textarea>
+      <label>Gate1 Report</label><input id="g2Gate1Report" value="reports/Security-Review-Gate1.md" />
+      <label>Threshold</label><input id="g2Threshold" type="number" step="0.01" value="0.78" />
+      <button onclick="runGate('gate2')">Run Gate2 Review</button>
+      <pre id="g2Out">等待运行...</pre>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Report Center / Approval</h2>
+      <label>Review ID</label><input id="reviewId" placeholder="运行 Gate 后自动填充，也可手动输入" />
+      <div class="row">
+        <button class="secondary" onclick="loadReport()">View Report</button>
+        <button onclick="saveReport()">Save Edited Report</button>
+        <button class="ok" onclick="approveReport()">Approve</button>
+      </div>
+      <label>Reviewer</label><input id="reviewer" value="security.reviewer@example.com" />
+      <label>Report Content</label><textarea id="reportContent" style="min-height:360px"></textarea>
+      <pre id="reportOut">等待操作...</pre>
+    </div>
+
+    <div class="card">
+      <h2>Knowledge Base Management</h2>
+      <label>Gate</label>
+      <select id="kbGate"><option value="gate1">gate1</option><option value="gate2">gate2</option></select>
+      <div class="row">
+        <button class="secondary" onclick="loadKb()">Load KB</button>
+        <button onclick="saveKb()">Manual Save KB</button>
+      </div>
+      <label>Version</label><input id="kbVersion" value="1.0.1" />
+      <label>Updated By</label><input id="kbUpdatedBy" value="security.admin@example.com" />
+      <label>Change Reason</label><input id="kbReason" value="Manual update from UI" />
+      <label>Knowledge Base JSON</label><textarea id="kbContent" style="min-height:360px"></textarea>
+      <pre id="kbOut">等待操作...</pre>
+    </div>
+  </section>
+</main>
+<script>
+  let latestReviewId = '';
+  const lines = (id) => document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
+  const show = (id, data) => document.getElementById(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+
+  async function health() {
+    const res = await fetch('/api/v1/health');
+    show('healthOut', await res.json());
+  }
+
+  async function runGate(gate) {
+    const prefix = gate === 'gate1' ? 'g1' : 'g2';
+    const body = {
+      project_id: document.getElementById(prefix + 'Project').value,
+      repository: document.getElementById(prefix + 'Repo').value,
+      branch: document.getElementById(prefix + 'Branch').value,
+      documents: lines(prefix + 'Docs'),
+      threshold: Number(document.getElementById(prefix + 'Threshold').value),
+      triggered_by: 'ui'
+    };
+    if (gate === 'gate2') body.gate1_report = document.getElementById('g2Gate1Report').value;
+    const res = await fetch(`/api/v1/security-review/${gate}/run`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const data = await res.json();
+    latestReviewId = data.review_id || '';
+    document.getElementById('reviewId').value = latestReviewId;
+    show(prefix + 'Out', data);
+  }
+
+  async function loadReport() {
+    const id = document.getElementById('reviewId').value || latestReviewId;
+    const res = await fetch(`/api/v1/reports/${id}`);
+    const text = await res.text();
+    document.getElementById('reportContent').value = text;
+    show('reportOut', res.ok ? 'Report loaded.' : text);
+  }
+
+  async function saveReport() {
+    const id = document.getElementById('reviewId').value || latestReviewId;
+    const body = {content: document.getElementById('reportContent').value, reviewer: document.getElementById('reviewer').value, comment: 'Manual report update from UI'};
+    const res = await fetch(`/api/v1/reports/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    show('reportOut', await res.json());
+  }
+
+  async function approveReport() {
+    const id = document.getElementById('reviewId').value || latestReviewId;
+    const body = {reviewer: document.getElementById('reviewer').value, comment: 'Approved from UI'};
+    const res = await fetch(`/api/v1/reports/${id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    show('reportOut', await res.json());
+  }
+
+  async function loadKb() {
+    const gate = document.getElementById('kbGate').value;
+    const res = await fetch(`/api/v1/knowledge-base/${gate}`);
+    const data = await res.json();
+    document.getElementById('kbContent').value = JSON.stringify(data, null, 2);
+    show('kbOut', 'Knowledge base loaded.');
+  }
+
+  async function saveKb() {
+    const gate = document.getElementById('kbGate').value;
+    let content;
+    try { content = JSON.parse(document.getElementById('kbContent').value); }
+    catch (e) { show('kbOut', 'Invalid JSON: ' + e.message); return; }
+    const body = {version: document.getElementById('kbVersion').value, updated_by: document.getElementById('kbUpdatedBy').value, change_reason: document.getElementById('kbReason').value, content};
+    const res = await fetch(`/api/v1/knowledge-base/${gate}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    show('kbOut', await res.json());
+  }
+</script>
+</body>
+</html>

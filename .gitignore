@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+data/reviews/*.json
+reports/Security-Review-Gate1.md
+reports/Security-Review-Gate2.md
+.DS_Store

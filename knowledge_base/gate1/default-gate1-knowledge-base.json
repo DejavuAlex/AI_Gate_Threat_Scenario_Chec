@@ -1,0 +1,264 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "1.0.0",
+  "gate": "Gate1",
+  "name": "Gate1 Business Requirement Threat Modeling Golden Knowledge Base",
+  "description": "用于业务需求阶段的自动化威胁建模、安全评审和安全控制措施生成。",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "未匹配上任何威胁场景，本次安全评估确认无安全风险。",
+    "score_formula": {
+      "semantic_similarity": 0.35,
+      "keyword_match": 0.25,
+      "business_context": 0.2,
+      "negative_evidence_adjustment": 0.1,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G1-BIZ-001",
+      "name": "文件上传或数据上传业务",
+      "problem_scenario": "是否存在文件上传/数据上传业务场景？",
+      "category": "File Upload",
+      "business_indicators": ["文件上传", "图片上传", "附件上传", "数据上传", "导入文件", "上传资料"],
+      "negative_indicators": ["不支持文件上传", "仅本地处理不上传"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["攻击者上传恶意脚本/木马实现远程代码执行", "通过超大文件发动存储型DoS攻击", "上传包含XSS的HTML/SVG文件实现客户端攻击"],
+      "security_control_requirements": ["白名单限制文件后缀，禁止可执行类型", "服务端校验文件头内容，防止文件伪装", "存储目录禁用脚本执行权限", "接入Security SDK文件上传控件"]
+    },
+    {
+      "id": "G1-BIZ-002",
+      "name": "URL跳转或开放重定向",
+      "problem_scenario": "是否存在URL跳转功能？",
+      "category": "Open Redirect",
+      "business_indicators": ["URL跳转", "重定向", "redirect", "callback", "returnUrl", "跳转链接"],
+      "negative_indicators": ["不支持外部跳转", "跳转地址固定"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["构造钓鱼链接诱导用户访问恶意网站", "绕过安全域名的信任链攻击"],
+      "security_control_requirements": ["跳转目标域名白名单校验", "签名验证跳转URL的合法性"]
+    },
+    {
+      "id": "G1-BIZ-003",
+      "name": "密码找回或密码重置",
+      "problem_scenario": "系统是否提供密码找回/重置？",
+      "category": "Account Recovery",
+      "business_indicators": ["密码找回", "密码重置", "忘记密码", "重置密码", "找回账号"],
+      "negative_indicators": ["不提供密码重置", "仅SSO登录"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["通过枚举手机号/邮箱获取有效账户", "重置令牌泄露导致账户劫持", "安全问题答案可暴力破解"],
+      "security_control_requirements": ["重置链接有效期≤10分钟", "单IP/账号每小时请求限速", "禁止返回账户存在性提示"]
+    },
+    {
+      "id": "G1-BIZ-004",
+      "name": "在线支付或交易流程",
+      "problem_scenario": "是否涉及在线支付流程？",
+      "category": "Payment",
+      "business_indicators": ["支付", "订单", "交易", "收银台", "付款", "退款", "金额"],
+      "negative_indicators": ["不涉及支付", "仅展示价格不交易"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["重复提交支付请求造成资金损失", "篡改支付金额参数", "盗用支付凭证"],
+      "security_control_requirements": ["交易流水号防重放机制", "关键参数如金额/订单号服务端签名校验", "集成PCI-DSS合规的支付通道"]
+    },
+    {
+      "id": "G1-BIZ-005",
+      "name": "用户评论或用户生成内容",
+      "problem_scenario": "是否存在用户生成内容（评论/帖子）？",
+      "category": "User Generated Content",
+      "business_indicators": ["评论", "帖子", "留言", "用户发布", "富文本", "UGC"],
+      "negative_indicators": ["不允许用户输入内容", "仅系统预置内容"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["存储型XSS注入恶意脚本", "CSRF攻击强制用户发布内容", "敏感信息泄露"],
+      "security_control_requirements": ["富文本内容沙箱隔离渲染", "输出编码防御XSS", "敏感词实时过滤和人工审核"]
+    },
+    {
+      "id": "G1-BIZ-006",
+      "name": "对外API服务",
+      "problem_scenario": "是否提供对外API服务？",
+      "category": "External API",
+      "business_indicators": ["API", "开放接口", "第三方调用", "接口服务", "OpenAPI", "REST"],
+      "negative_indicators": ["无对外接口", "仅内部离线处理"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["未授权访问敏感数据接口", "SQL/NoSQL注入攻击", "API密钥泄露导致资源滥用"],
+      "security_control_requirements": ["强制OAuth2.0鉴权和细粒度RBAC", "输入参数严格类型校验", "API调用频率限制"]
+    },
+    {
+      "id": "G1-BIZ-007",
+      "name": "数据批量导出",
+      "problem_scenario": "是否支持数据批量导出？",
+      "category": "Data Export",
+      "business_indicators": ["数据导出", "批量导出", "下载报表", "导出用户数据", "CSV", "Excel"],
+      "negative_indicators": ["不支持导出", "仅单条查看"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["导出全量用户敏感数据导致PII泄露", "SSRF攻击利用导出功能扫描内网"],
+      "security_control_requirements": ["导出操作需二次认证", "数据脱敏处理", "限制导出目标地址为公网可信域名"]
+    },
+    {
+      "id": "G1-BIZ-008",
+      "name": "配置文件或配置管理",
+      "problem_scenario": "系统是否使用配置文件？",
+      "category": "Configuration Management",
+      "business_indicators": ["配置文件", "系统配置", "环境配置", "密钥配置", "连接串"],
+      "negative_indicators": ["无配置文件", "无敏感配置"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["硬编码密钥/密码被逆向破解", "配置文件泄露至公开仓库"],
+      "security_control_requirements": ["敏感配置加密存储", ".gitignore排除敏感配置文件", "运行时环境变量注入密钥"]
+    },
+    {
+      "id": "G1-BIZ-009",
+      "name": "系统邮件发送",
+      "problem_scenario": "是否发送系统邮件？",
+      "category": "Email",
+      "business_indicators": ["发送邮件", "邮件通知", "SMTP", "验证码邮件", "营销邮件"],
+      "negative_indicators": ["不发送邮件"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["恶意构造超长收件人列表耗尽资源", "邮件内容XSS钓鱼攻击", "伪造发件人实施钓鱼"],
+      "security_control_requirements": ["SMTP服务配置发信速率限制", "邮件正文强制纯文本或HTML过滤", "SPF/DKIM/DMARC校验"]
+    },
+    {
+      "id": "G1-BIZ-010",
+      "name": "第三方SDK集成",
+      "problem_scenario": "是否嵌入第三方SDK？",
+      "category": "Third-party SDK",
+      "business_indicators": ["第三方SDK", "外部组件", "第三方库", "插件", "npm包", "Maven依赖"],
+      "negative_indicators": ["不使用第三方SDK", "无外部依赖"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["SDK后门收集用户隐私数据", "SDK漏洞导致宿主应用被利用"],
+      "security_control_requirements": ["仅从官方仓库获取SDK并校验哈希值", "网络权限最小化", "定期CVE漏洞扫描"]
+    },
+    {
+      "id": "G1-BIZ-011",
+      "name": "管理员后台",
+      "problem_scenario": "是否存在管理员后台？",
+      "category": "Admin Portal",
+      "business_indicators": ["管理后台", "管理员", "运营后台", "控制台", "admin"],
+      "negative_indicators": ["无后台管理", "无管理员角色"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["弱密码爆破获取管理员权限", "未授权访问后台路径"],
+      "security_control_requirements": ["后台访问IP白名单限制", "强制多因素认证", "登录失败锁定策略"]
+    },
+    {
+      "id": "G1-BIZ-012",
+      "name": "WebSocket通信",
+      "problem_scenario": "是否使用WebSocket？",
+      "category": "WebSocket",
+      "business_indicators": ["WebSocket", "实时通信", "长连接", "在线聊天", "实时推送"],
+      "negative_indicators": ["不使用WebSocket", "仅HTTP短连接"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["未加密传输敏感数据", "DoS攻击耗尽连接资源"],
+      "security_control_requirements": ["强制wss:// TLS加密", "服务端限制最大并发连接数", "消息体大小限制"]
+    },
+    {
+      "id": "G1-BIZ-013",
+      "name": "动态代码执行",
+      "problem_scenario": "是否执行用户输入的代码？",
+      "category": "Dynamic Code Execution",
+      "business_indicators": ["执行代码", "脚本执行", "在线运行", "表达式计算", "插件脚本"],
+      "negative_indicators": ["不执行用户代码", "仅展示代码文本"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["远程命令执行获取服务器权限", "内存破坏导致服务崩溃"],
+      "security_control_requirements": ["绝对禁止eval()/exec()类危险函数", "使用沙箱环境隔离执行", "输入命令白名单机制"]
+    },
+    {
+      "id": "G1-BIZ-014",
+      "name": "前端跨域访问API",
+      "problem_scenario": "前端是否跨域访问API？",
+      "category": "CORS",
+      "business_indicators": ["跨域", "CORS", "前后端分离", "跨域访问API"],
+      "negative_indicators": ["同源访问", "不跨域"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["配置错误导致任意网站可跨域读取数据"],
+      "security_control_requirements": ["严格指定Access-Control-Allow-Origin域名", "禁止不必要的Credential跨域请求"]
+    },
+    {
+      "id": "G1-BIZ-015",
+      "name": "短信验证码",
+      "problem_scenario": "是否使用短信验证码？",
+      "category": "SMS Verification",
+      "business_indicators": ["短信验证码", "手机号验证", "OTP", "验证码登录"],
+      "negative_indicators": ["不使用短信验证码"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["验证码爆破", "接口未限速导致短信轰炸"],
+      "security_control_requirements": ["验证码有效期≤5分钟且错误3次失效", "单手机号每日发送上限≤10条", "图形验证码前置拦截机器人"]
+    },
+    {
+      "id": "G1-BIZ-016",
+      "name": "数据备份",
+      "problem_scenario": "是否进行系统数据备份？",
+      "category": "Backup",
+      "business_indicators": ["数据备份", "备份文件", "灾备", "恢复数据", "快照"],
+      "negative_indicators": ["不做备份", "无持久化数据"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["备份文件被公开下载导致数据泄露", "未加密备份遭窃取"],
+      "security_control_requirements": ["备份存储隔离", "AES-256加密备份文件", "备份访问日志审计"]
+    },
+    {
+      "id": "G1-BIZ-017",
+      "name": "URL敏感参数传递",
+      "problem_scenario": "是否通过URL传递敏感参数？",
+      "category": "Sensitive URL Parameter",
+      "business_indicators": ["URL参数", "user_id", "token", "订单号", "敏感参数", "GET请求"],
+      "negative_indicators": ["不通过URL传递敏感信息"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["参数篡改实现越权访问", "Referer泄漏敏感URL"],
+      "security_control_requirements": ["关键参数服务端签名", "敏感操作禁用GET请求", "HTTPS场景下限制Referrer泄漏"]
+    },
+    {
+      "id": "G1-BIZ-018",
+      "name": "第三方登录",
+      "problem_scenario": "是否支持微信/Google等第三方登录？",
+      "category": "Federated Login",
+      "business_indicators": ["第三方登录", "OAuth", "微信登录", "Google登录", "SSO"],
+      "negative_indicators": ["不支持第三方登录"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["OAuth回调地址劫持窃取授权码", "用户身份伪造攻击"],
+      "security_control_requirements": ["严格校验state参数防CSRF", "绑定手机号二次验证机制"]
+    },
+    {
+      "id": "G1-BIZ-019",
+      "name": "动态文件加载或文件包含",
+      "problem_scenario": "是否动态加载外部文件？",
+      "category": "File Inclusion",
+      "business_indicators": ["动态加载文件", "读取文件", "模板文件", "外部文件", "文件路径"],
+      "negative_indicators": ["不动态加载文件"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["路径遍历读取敏感文件", "远程文件包含执行恶意代码"],
+      "security_control_requirements": ["禁用动态包含路径", "文件路径白名单校验", "运行账户无系统文件读取权限"]
+    },
+    {
+      "id": "G1-BIZ-020",
+      "name": "GraphQL接口",
+      "problem_scenario": "是否使用GraphQL API？",
+      "category": "GraphQL",
+      "business_indicators": ["GraphQL", "schema", "resolver", "复杂查询"],
+      "negative_indicators": ["不使用GraphQL"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["恶意复杂查询耗尽服务器资源", "未授权访问私有字段"],
+      "security_control_requirements": ["查询深度和复杂度限制", "按角色定义字段访问权限", "生产环境禁用Introspection"]
+    },
+    {
+      "id": "G1-BIZ-021",
+      "name": "云存储桶访问",
+      "problem_scenario": "是否使用云存储（S3/OSS/COS）？",
+      "category": "Cloud Storage",
+      "business_indicators": ["S3", "OSS", "COS", "云存储", "对象存储", "文件桶"],
+      "negative_indicators": ["不使用云存储"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["存储桶配置错误导致公开可读", "访问密钥泄露引发数据泄露"],
+      "security_control_requirements": ["存储桶默认私有和最小权限原则", "临时访问令牌代替长期密钥", "开启桶访问日志审计"]
+    },
+    {
+      "id": "G1-BIZ-022",
+      "name": "前端源码敏感信息",
+      "problem_scenario": "前端是否包含敏感信息？",
+      "category": "Frontend Source Exposure",
+      "business_indicators": ["前端源码", "JavaScript", "API Key", "前端配置", "源码注释"],
+      "negative_indicators": ["前端不包含敏感信息"],
+      "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
+      "risk_identification": ["源码注释泄露API密钥/密码", "JavaScript硬编码业务逻辑漏洞"],
+      "security_control_requirements": ["构建时删除注释", "关键逻辑移至后端", "代码混淆和反调试保护"]
+    }
+  ]
+}

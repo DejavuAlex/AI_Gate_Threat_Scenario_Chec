@@ -8,6 +8,7 @@ from ..schemas import ReviewRunRequest
 from .documents import read_documents
 from .gate2_verifier import verify_gate1_controls
 from .knowledge_base import KnowledgeBaseService
+from .llm_matching import LLMMatchingService
 from .matching import MatchingEngine
 from .report_generator import generate_gate1_report, generate_gate2_report
 
@@ -15,6 +16,7 @@ from .report_generator import generate_gate1_report, generate_gate2_report
 class ReviewService:
     def __init__(self):
         self.kb_service = KnowledgeBaseService()
+        self.llm_matching = LLMMatchingService()
 
     def _store_review(self, review_id: str, payload: dict) -> None:
         path = REVIEWS_DIR / f"{review_id}.json"
@@ -33,6 +35,7 @@ class ReviewService:
         document_text, docs = read_documents(request.documents)
         matcher = MatchingEngine(kb, request.threshold)
         match_result = matcher.match(document_text, gate)
+        match_result = self.llm_matching.enhance_matches(gate, document_text, docs, kb, match_result, request.threshold)
 
         gate1_report_text = ""
         verification = {"implemented": 0, "not_implemented": 0, "items": []}
@@ -68,6 +71,8 @@ class ReviewService:
             "report_path": str(report_file.relative_to(REPO_ROOT)),
             "report_url": f"/api/v1/reports/{review_id}",
             "approval_status": "pending",
+            "llm_enabled": match_result.get("llm_enabled", False),
+            "llm_error": match_result.get("llm_error"),
             "gate1_control_verification": verification,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "request": request.model_dump(),

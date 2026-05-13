@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from .schemas import ApproveRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
 from .services.knowledge_base import KnowledgeBaseService
@@ -25,6 +25,21 @@ def run_gate2(request: ReviewRunRequest):
     return review_service.run("gate2", request)
 
 
+@router.get("/work-orders")
+def list_work_orders(product_name: str | None = Query(default=None), product_version: str | None = Query(default=None)):
+    return {
+        "items": review_service.list_work_orders(product_name=product_name, product_version=product_version)
+    }
+
+
+@router.get("/work-orders/{work_order_id}")
+def get_work_order(work_order_id: str):
+    try:
+        return review_service.get_work_order(work_order_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="work order not found")
+
+
 @router.get("/security-review/{gate}/{review_id}")
 def get_review(gate: str, review_id: str):
     try:
@@ -42,6 +57,15 @@ def get_report(review_id: str):
         return review_service.get_report_content(review_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="report not found")
+
+
+@router.get("/reports/{review_id}/download")
+def download_report(review_id: str):
+    try:
+        path = review_service.get_report_path(review_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="report not found")
+    return FileResponse(path=path, filename=path.name, media_type="text/markdown")
 
 
 @router.put("/reports/{review_id}")
@@ -69,6 +93,14 @@ def approve_gate1_report(review_id: str, request: ApproveRequest):
 def get_knowledge_base(gate: str):
     try:
         return kb_service.load(gate)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/knowledge-base/{gate}/history")
+def get_knowledge_base_history(gate: str):
+    try:
+        return {"items": kb_service.list_history(gate)}
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

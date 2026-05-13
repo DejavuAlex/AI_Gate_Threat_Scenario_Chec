@@ -27,36 +27,45 @@ def _scenario_markdown(item: dict[str, Any]) -> str:
         lines.extend([f"- {e}" for e in item["matched_evidence"]])
     else:
         lines.append("- 无直接关键词证据，基于语义和上下文匹配。")
+    if item.get("matched_reason"):
+        lines.extend(["", "#### LLM Matched Reason", "", f"- {item['matched_reason']}"])
     lines.extend(["", "#### Score Calculation", "", "| Metric | Score |", "|---|---:|"])
     for key, value in item.get("score_breakdown", {}).items():
         lines.append(f"| {key} | {value} |")
     lines.append(f"| Final Score | {item.get('final_score')} |")
     lines.extend(["", "#### Required Security Controls", ""])
-    lines.extend([f"- {control}" for control in scenario.get("security_control_requirements", [])])
+    controls = item.get("optimized_security_controls") or scenario.get("security_control_requirements", [])
+    lines.extend([f"- {control}" for control in controls])
     lines.append("")
     return "\n".join(lines)
 
 
-def generate_gate1_report(review_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any]) -> str:
-    lines = [
-        "# Security Review Gate1 Report",
-        "",
+def _metadata_lines(review_id: str, work_order_id: str, request: Any, gate: str, review_type: str, kb_label: str, kb: dict[str, Any]) -> list[str]:
+    return [
         "## 1. Review Metadata",
         "",
+        f"- Work Order ID: {work_order_id}",
         f"- Review ID: {review_id}",
-        "- Gate: Gate1",
-        "- Review Type: Business Requirement Security Review",
+        f"- Product Name: {request.product_name}",
+        f"- Product Version: {request.product_version}",
+        f"- Project ID: {request.project_id}",
+        f"- Gate: {gate}",
+        f"- Review Type: {review_type}",
         f"- Review Time: {datetime.now(timezone.utc).isoformat()}",
         f"- Repository: {request.repository or ''}",
         f"- Branch: {request.branch or ''}",
         f"- Triggered By: {request.triggered_by}",
-        f"- Knowledge Base Version: {kb.get('knowledge_base_version')}",
+        f"- {kb_label}: {kb.get('knowledge_base_version')}",
         f"- Match Threshold: {request.threshold}",
         "- Approval Status: Pending",
         "",
-        "## 2. Input Documents",
-        "",
     ]
+
+
+def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any]) -> str:
+    lines = ["# Security Review Gate1 Report", ""]
+    lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate1", "Business Requirement Security Review", "Knowledge Base Version", kb))
+    lines.extend(["## 2. Input Documents", ""])
     lines.extend([f"- {doc}" for doc in request.documents])
     lines.extend(["", "## 3. Matching Result", ""])
     if not match_result.get("matched"):
@@ -66,12 +75,10 @@ def generate_gate1_report(review_id: str, request: Any, kb: dict[str, Any], matc
         lines.append("")
         for item in match_result.get("matched_scenarios", []):
             lines.append(_scenario_markdown(item))
-    lines.extend([
-        "", "## 4. Final Security Control Requirements", ""
-    ])
+    lines.extend(["", "## 4. Final Security Control Requirements", ""])
     controls = []
     for item in match_result.get("matched_scenarios", []):
-        controls.extend(item["scenario"].get("security_control_requirements", []))
+        controls.extend(item.get("optimized_security_controls") or item["scenario"].get("security_control_requirements", []))
     if controls:
         lines.extend([f"- {control}" for control in dict.fromkeys(controls)])
     else:
@@ -87,26 +94,11 @@ def generate_gate1_report(review_id: str, request: Any, kb: dict[str, Any], matc
     return "\n".join(lines)
 
 
-def generate_gate2_report(review_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], verification: dict[str, Any]) -> str:
-    lines = [
-        "# Security Review Gate2 Report",
-        "",
-        "## 1. Review Metadata",
-        "",
-        f"- Review ID: {review_id}",
-        "- Gate: Gate2",
-        "- Review Type: Architecture and Technical Requirement Security Review",
-        f"- Review Time: {datetime.now(timezone.utc).isoformat()}",
-        f"- Repository: {request.repository or ''}",
-        f"- Branch: {request.branch or ''}",
-        f"- Triggered By: {request.triggered_by}",
-        f"- Gate2 Knowledge Base Version: {kb.get('knowledge_base_version')}",
-        f"- Gate1 Report: {request.gate1_report or ''}",
-        f"- Match Threshold: {request.threshold}",
-        "",
-        "## 2. Input Documents",
-        "",
-    ]
+def generate_gate2_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], verification: dict[str, Any]) -> str:
+    lines = ["# Security Review Gate2 Report", ""]
+    lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate2", "Architecture and Technical Requirement Security Review", "Gate2 Knowledge Base Version", kb))
+    lines.extend([f"- Gate1 Report: {request.gate1_report or 'Auto latest report for the same product/version'}", ""])
+    lines.extend(["## 2. Input Documents", ""])
     lines.extend([f"- {doc}" for doc in request.documents])
     lines.extend(["", "## 3. Gate2 Knowledge Base Matching Result", ""])
     if not match_result.get("matched"):
@@ -136,7 +128,7 @@ def generate_gate2_report(review_id: str, request: Any, kb: dict[str, Any], matc
     lines.extend(["", "## 7. Final Security Control Requirements", ""])
     controls = []
     for item in match_result.get("matched_scenarios", []):
-        controls.extend(item["scenario"].get("security_control_requirements", []))
+        controls.extend(item.get("optimized_security_controls") or item["scenario"].get("security_control_requirements", []))
     if controls:
         lines.extend([f"- {control}" for control in dict.fromkeys(controls)])
     else:

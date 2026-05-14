@@ -43,7 +43,8 @@ class KnowledgeBaseService:
             "previous_snapshot": previous,
             "new_snapshot": next_content,
         }
-        path = self._history_dir(gate) / f"{now.replace(':', '').replace('+', 'Z')}-{history_id}.json"
+        safe_time = now.replace(":", "").replace("+", "Z")
+        path = self._history_dir(gate) / f"{safe_time}-{history_id}.json"
         path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
         return history
 

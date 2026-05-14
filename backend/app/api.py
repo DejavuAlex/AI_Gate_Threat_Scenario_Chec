@@ -32,6 +32,23 @@ def run_gate1(request: ReviewRunRequest):
 
 @router.post("/security-review/gate2/run")
 def run_gate2(request: ReviewRunRequest):
+    """Direct Gate2 entrypoint for UI/API/CI/CD callers.
+
+    If task_id and gate1_report are provided, Gate2 runs under the existing task
+    and verifies against that Gate1 report. If gate1_report is omitted, the
+    service tries to use the latest Gate1 report from the same task.
+    """
+    return review_service.run("gate2", request)
+
+
+@router.post("/ci/security-review/gate2/run")
+def run_gate2_from_ci(request: ReviewRunRequest):
+    """CI/CD-friendly Gate2 alias.
+
+    This endpoint is intentionally equivalent to /security-review/gate2/run but
+    makes pipeline integrations easier to discover and document.
+    """
+    request.triggered_by = request.triggered_by or "ci-cd"
     return review_service.run("gate2", request)
 
 
@@ -111,6 +128,11 @@ def approve_report(review_id: str, request: ApproveRequest):
 
 @router.post("/security-review/gate1/{review_id}/approve")
 def approve_gate1_report(review_id: str, request: ApproveRequest):
+    return approve_report(review_id, request)
+
+
+@router.post("/security-review/gate2/{review_id}/approve")
+def approve_gate2_report(review_id: str, request: ApproveRequest):
     return approve_report(review_id, request)
 
 

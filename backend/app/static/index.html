@@ -45,7 +45,7 @@
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th,td { border-bottom:1px solid var(--line); padding:9px; text-align:left; vertical-align:top; }
     th { color:var(--muted); background:#0b1220; position:sticky; top:0; z-index:1; }
-    .tableWrap { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:10px; }
+    .tableWrap { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:10px; margin-top:12px; }
     .note { border-left:4px solid var(--accent); background:#0b1220; padding:10px 12px; border-radius:8px; margin-bottom:14px; }
     @media(max-width:900px){.app{grid-template-columns:1fr}.three,.two{grid-template-columns:1fr}}
   </style>
@@ -103,7 +103,7 @@ specs/implementation-plan.md</textarea>
           <h3>Gate2 Direct Call</h3>
           <div class="note">用于 API / CI/CD / CLI 直接触发 Gate2。若 task_id 与 gate1_report 留空，将作为独立 Gate2 评审运行。</div>
           <div class="two"><div><label>Product Name</label><input id="g2Product" value="Demo Security Gate Product"></div><div><label>Product Version</label><input id="g2Version" value="v1.0.0"></div></div>
-          <label>Existing Task ID / Code</label><input id="g2TaskId" placeholder="例如 task-xxx 或 task-000001，可留空">
+          <label>Existing Task ID / Code</label><input id="g2TaskId" placeholder="例如 task-xxx 或 TASK-000001，可留空">
           <div class="three"><div><label>Project ID</label><input id="g2Project" value="demo"></div><div><label>Repository</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g2Branch" value="main"></div></div>
           <label>Gate2 Documents</label><textarea id="g2Docs">specs/architecture.md
 specs/api-design.md
@@ -122,7 +122,7 @@ specs/implementation-plan.md</textarea>
         <h3>AI Gate Task List / Review 工单详情</h3>
         <div class="three"><div><label>Product</label><select id="filterProduct"></select></div><div><label>Version</label><select id="filterVersion"></select></div><div><label>Task</label><select id="filterTask"></select></div></div>
         <div class="row"><button onclick="loadTasks()">Search</button><button class="secondary" onclick="clearFilters()">Show All</button></div>
-        <div class="tableWrap"><table><thead><tr><th>Serial / Code</th><th>Product / Version</th><th>Task Name</th><th>Flow / Result</th><th>Gate1</th><th>Gate2</th><th>Approval / Trigger</th><th>Auto Gate2</th><th>Action</th></tr></thead><tbody id="tasksBody"></tbody></table></div>
+        <div class="tableWrap"><table><thead><tr><th>Serial / Code</th><th>Product / Version</th><th>Task Name</th><th>Flow / Result</th><th>Gate1</th><th>Gate2</th><th>Approval / Trigger</th><th>Auto Gate2</th><th>Final</th><th>Action</th></tr></thead><tbody id="tasksBody"></tbody></table></div>
         <pre id="taskOut">等待加载...</pre>
       </div>
     </section>
@@ -154,8 +154,12 @@ POST /api/v1/security-review/gate2/run
 Gate2 CI/CD alias:
 POST /api/v1/ci/security-review/gate2/run
 
+Task final report:
+GET /api/v1/tasks/{task_id}/final-report
+GET /api/v1/tasks/{task_id}/final-report/download
+
 CLI Gate2 direct:
-python cli/security_gate_cli.py gate2 run --product-name "Demo" --product-version "v1" --task-id task-000001 --docs specs/architecture.md specs/api-design.md
+python cli/security_gate_cli.py gate2 run --product-name "Demo" --product-version "v1" --task-id TASK-000001 --docs specs/architecture.md specs/api-design.md
 
 CLI approve Gate1 and auto-run Gate2 if risk exists:
 python cli/security_gate_cli.py approve --review-id gate1-review-xxx --reviewer security.reviewer@example.com</pre></div>
@@ -182,8 +186,9 @@ function fillFilters(){fillSelect('filterProduct',[''].concat(products()),'',x=>
 function fillReportTaskSelect(){fillSelect('reportTask',state.tasks,state.selectedTask,t=>`${t.task_code||''} ${t.product_name||''} ${t.product_version||''}`,t=>t.task_id);onReportTaskChange();}
 function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td><td>${esc(t.updated_at||'')}</td></tr>`;}
 function reportLinks(t,gate){const url=t[`latest_${gate}_report_url`], dl=t[`latest_${gate}_download_url`];return url?`<span class="badge ${gate==='gate1'?'ok':'warn'}">${gate}</span> <a target="_blank" href="${esc(url)}">View</a>/<a target="_blank" href="${esc(dl)}">Download</a><br>`:`<span class="badge">${gate}: -</span><br>`;}
-async function loadTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(t=>t.product_name===p);if(v)rows=rows.filter(t=>t.product_version===v);if(tid)rows=rows.filter(t=>t.task_id===tid);byId('tasksBody').innerHTML=rows.map(taskRowFull).join('')||'<tr><td colspan="9" class="muted">No tasks</td></tr>';show('taskOut',{count:rows.length});}
-function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
+async function loadTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(t=>t.product_name===p);if(v)rows=rows.filter(t=>t.product_version===v);if(tid)rows=rows.filter(t=>t.task_id===tid);byId('tasksBody').innerHTML=rows.map(taskRowFull).join('')||'<tr><td colspan="10" class="muted">No tasks</td></tr>';show('taskOut',{count:rows.length});}
+function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
+function finalLinks(t){const view=t.final_report_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report`;const dl=t.final_report_download_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report/download`;return `<a target="_blank" href="${esc(view)}">Final</a><br><a target="_blank" href="${esc(dl)}">Download</a>`;}
 function approvalText(x){return x?`${esc(x.approved_by)}<br><span class="small muted">${esc(x.approved_at)}</span>`:'-';}
 function clearFilters(){byId('filterProduct').value='';byId('filterVersion').value='';byId('filterTask').value='';loadTasks();}
 function selectTask(id){state.selectedTask=id;fillReportTaskSelect();show('taskOut',{selected_task:id});}

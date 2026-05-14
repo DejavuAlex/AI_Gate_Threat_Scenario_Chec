@@ -119,7 +119,7 @@ Content-Type: application/json
   "project_id": "demo",
   "product_name": "Demo Security Gate Product",
   "product_version": "v1.0.0",
-  "task_id": "task-000001",
+  "task_id": "TASK-000001",
   "repository": "quy7_roche/AI_Security_Gate",
   "branch": "main",
   "documents": [
@@ -166,6 +166,8 @@ latest_gate2_report_url
 latest_gate2_download_url
 approval
 auto_gate2
+final_report_url
+final_report_download_url
 ```
 
 The final task report is an on-demand Markdown summary that includes:
@@ -183,7 +185,7 @@ References to detailed story-level scoring reports
 
 ```http
 GET /api/v1/work-orders
-GET /api/v1/work-orders?task_id=task-000001
+GET /api/v1/work-orders?task_id=TASK-000001
 GET /api/v1/work-orders/{work_order_id}
 ```
 
@@ -224,10 +226,16 @@ Direct Gate2:
 python cli/security_gate_cli.py gate2 run \
   --product-name "Demo Security Gate Product" \
   --product-version "v1.0.0" \
-  --task-id task-000001 \
+  --task-id TASK-000001 \
   --docs specs/architecture.md specs/api-design.md specs/data-model.md specs/implementation-plan.md \
   --gate1-report reports/.../Security-Review-Gate1-xxx.md \
   --triggered-by ci
+```
+
+Final task report reference:
+
+```bash
+python cli/security_gate_cli.py final-report --task-id TASK-000001
 ```
 
 ## CI/CD curl Example
@@ -239,7 +247,7 @@ curl -X POST "http://localhost:18080/api/v1/ci/security-review/gate2/run" \
     "project_id":"demo",
     "product_name":"Demo Security Gate Product",
     "product_version":"v1.0.0",
-    "task_id":"task-000001",
+    "task_id":"TASK-000001",
     "repository":"quy7_roche/AI_Security_Gate",
     "branch":"main",
     "documents":["specs/architecture.md","specs/api-design.md","specs/data-model.md","specs/implementation-plan.md"],
@@ -251,9 +259,9 @@ curl -X POST "http://localhost:18080/api/v1/ci/security-review/gate2/run" \
 ## Final Report curl Example
 
 ```bash
-curl "http://localhost:18080/api/v1/tasks/task-000001/final-report"
+curl "http://localhost:18080/api/v1/tasks/TASK-000001/final-report"
 
-curl -OJ "http://localhost:18080/api/v1/tasks/task-000001/final-report/download"
+curl -OJ "http://localhost:18080/api/v1/tasks/TASK-000001/final-report/download"
 ```
 
 ## Knowledge Base APIs

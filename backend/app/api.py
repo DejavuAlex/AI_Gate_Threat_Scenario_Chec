@@ -11,19 +11,10 @@ kb_service = KnowledgeBaseService()
 
 
 def _task_final_report_markdown(task: dict) -> str:
-    """Build an on-demand final task summary without creating extra files.
-
-    The detailed Gate1/Gate2 reports remain the source of truth. This summary
-    gives reviewers and CI users one stable place to see the full workflow status
-    and links to all generated artifacts for a single review task.
-    """
     approval = task.get("approval", {}) or {}
     auto_gate2 = task.get("auto_gate2", {}) or {}
     reports = task.get("reports", {}) or {}
-    gate1_reports = reports.get("gate1", []) or []
-    gate2_reports = reports.get("gate2", []) or []
     activities = task.get("activities", []) or []
-
     lines = [
         "# AI Gate Final Review Task Summary",
         "",
@@ -58,49 +49,21 @@ def _task_final_report_markdown(task: dict) -> str:
     ]
     for gate in ["gate1", "gate2"]:
         item = approval.get(gate) or {}
-        lines.append(
-            f"| {gate} | {item.get('review_id', '')} | {item.get('approved_by', '')} | "
-            f"{item.get('approved_at', '')} | {item.get('comment', '')} |"
-        )
-
-    lines.extend([
-        "",
-        "## 4. Generated Reports",
-        "",
-        "| Gate | Review ID | Activity ID | View URL | Download URL | Report Path |",
-        "|---|---|---|---|---|---|",
-    ])
-    for gate, rows in [("gate1", gate1_reports), ("gate2", gate2_reports)]:
-        for item in rows:
-            lines.append(
-                f"| {gate} | {item.get('review_id', '')} | {item.get('work_order_id', '')} | "
-                f"{item.get('report_url', '')} | {item.get('report_download_url', '')} | {item.get('report_path', '')} |"
-            )
-    if not gate1_reports and not gate2_reports:
+        lines.append(f"| {gate} | {item.get('review_id', '')} | {item.get('approved_by', '')} | {item.get('approved_at', '')} | {item.get('comment', '')} |")
+    lines.extend(["", "## 4. Generated Reports", "", "| Gate | Review ID | Activity ID | View URL | Download URL | Report Path |", "|---|---|---|---|---|---|"])
+    has_report = False
+    for gate in ["gate1", "gate2"]:
+        for item in reports.get(gate, []) or []:
+            has_report = True
+            lines.append(f"| {gate} | {item.get('review_id', '')} | {item.get('work_order_id', '')} | {item.get('report_url', '')} | {item.get('report_download_url', '')} | {item.get('report_path', '')} |")
+    if not has_report:
         lines.append("| - | - | - | - | - | - |")
-
-    lines.extend([
-        "",
-        "## 5. Gate Run Timeline",
-        "",
-        "| Created At | Gate | Activity Name | Review ID | Matched | Approval Status | Triggered By |",
-        "|---|---|---|---|---|---|---|",
-    ])
+    lines.extend(["", "## 5. Gate Run Timeline", "", "| Created At | Gate | Activity Name | Review ID | Matched | Approval Status | Triggered By |", "|---|---|---|---|---|---|---|"])
     for item in activities:
-        lines.append(
-            f"| {item.get('created_at', '')} | {item.get('gate', '')} | {item.get('activity_name', '')} | "
-            f"{item.get('review_id', '')} | {item.get('matched', '')} | {item.get('approval_status', '')} | {item.get('triggered_by', '')} |"
-        )
+        lines.append(f"| {item.get('created_at', '')} | {item.get('gate', '')} | {item.get('activity_name', '')} | {item.get('review_id', '')} | {item.get('matched', '')} | {item.get('approval_status', '')} | {item.get('triggered_by', '')} |")
     if not activities:
         lines.append("| - | - | - | - | - | - | - |")
-
-    lines.extend([
-        "",
-        "## 6. Detailed Report References",
-        "",
-        "For story-level scenario scoring, risk scoring, and final security controls, open the Gate1/Gate2 detailed reports listed above.",
-        "",
-    ])
+    lines.extend(["", "## 6. Detailed Report References", "", "For story-level scenario scoring, risk scoring, and final security controls, open the Gate1/Gate2 detailed reports listed above.", ""])
     return "\n".join(lines)
 
 
@@ -126,13 +89,11 @@ def run_gate1(request: ReviewRunRequest):
 
 @router.post("/security-review/gate2/run")
 def run_gate2(request: ReviewRunRequest):
-    """Direct Gate2 entrypoint for UI/API/CI/CD callers."""
     return review_service.run("gate2", request)
 
 
 @router.post("/ci/security-review/gate2/run")
 def run_gate2_from_ci(request: ReviewRunRequest):
-    """CI/CD-friendly Gate2 alias."""
     request.triggered_by = request.triggered_by or "ci-cd"
     return review_service.run("gate2", request)
 
@@ -165,21 +126,12 @@ def download_task_final_report(task_id: str):
         task = review_service.get_task(task_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="task not found")
-    content = _task_final_report_markdown(task)
     filename = f"{task.get('task_code') or task_id}-Final-Review-Summary.md"
-    return Response(
-        content=content,
-        media_type="text/markdown",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return Response(content=_task_final_report_markdown(task), media_type="text/markdown", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.get("/work-orders")
-def list_work_orders(
-    product_name: str | None = Query(default=None),
-    product_version: str | None = Query(default=None),
-    task_id: str | None = Query(default=None),
-):
+def list_work_orders(product_name: str | None = Query(default=None), product_version: str | None = Query(default=None), task_id: str | None = Query(default=None)):
     return {"items": review_service.list_work_orders(product_name=product_name, product_version=product_version, task_id=task_id)}
 
 

@@ -6,13 +6,11 @@ class ReviewRunRequest(BaseModel):
     project_id: str = "demo"
     product_name: str = "Demo Security Gate Product"
     product_version: str = "v1.0.0"
-    # If omitted, Gate1 creates a new serial task. Gate2 can pass an existing task_id.
     task_id: str | None = None
     task_name: str | None = None
     repository: str | None = None
     branch: str | None = None
     documents: list[str] = Field(default_factory=list)
-    # Used when Gate1 approval auto-runs Gate2.
     gate2_documents: list[str] = Field(default_factory=list)
     knowledge_base_version: str = "latest"
     threshold: float = 0.78

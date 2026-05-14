@@ -47,6 +47,12 @@ def approve(args: argparse.Namespace) -> int:
     return 0
 
 
+def final_report(args: argparse.Namespace) -> int:
+    task = ReviewService().get_task(args.task_id)
+    print(json.dumps(task, ensure_ascii=False, indent=2) if args.json else f"Task {task.get('task_code') or task.get('task_id')} final report is available at /api/v1/tasks/{task.get('task_id')}/final-report")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="AI Security Gate CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -58,7 +64,7 @@ def main() -> int:
         run.add_argument("--project-id", default="demo")
         run.add_argument("--product-name", default="Demo Security Gate Product")
         run.add_argument("--product-version", default="v1.0.0")
-        run.add_argument("--task-id", default=None, help="Existing task id. Gate1 creates a new serial task if omitted.")
+        run.add_argument("--task-id", default=None, help="Existing task id or task code. Gate1 creates a new serial task if omitted.")
         run.add_argument("--task-name", default=None)
         run.add_argument("--repo", default="quy7_roche/AI_Security_Gate")
         run.add_argument("--branch", default="main")
@@ -75,11 +81,17 @@ def main() -> int:
     approve_parser.add_argument("--reviewer", required=True)
     approve_parser.add_argument("--comment", default=None)
 
+    final_parser = sub.add_parser("final-report")
+    final_parser.add_argument("--task-id", required=True)
+    final_parser.add_argument("--json", action="store_true")
+
     args = parser.parse_args()
     if args.command in {"gate1", "gate2"} and args.action == "run":
         return run_gate(args.command, args)
     if args.command == "approve":
         return approve(args)
+    if args.command == "final-report":
+        return final_report(args)
     parser.print_help()
     return 1
 

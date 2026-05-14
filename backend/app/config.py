@@ -14,12 +14,19 @@ REVIEWS_DIR = DATA_DIR / "reviews"
 WORK_ORDERS_DIR = DATA_DIR / "work_orders"
 TASKS_DIR = DATA_DIR / "tasks"
 KB_HISTORY_DIR = DATA_DIR / "knowledge_base_history"
+TASK_SEQUENCE_FILE = DATA_DIR / "task_sequence.json"
 
 for directory in (REPORTS_DIR, DATA_DIR, SPECS_DIR, REVIEWS_DIR, WORK_ORDERS_DIR, TASKS_DIR, KB_HISTORY_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_THRESHOLD = 0.78
 UNMATCHED_MESSAGE = "未匹配上任何威胁场景，本次安全评估确认无安全风险。"
+DEFAULT_GATE2_DOCUMENTS = [
+    "specs/architecture.md",
+    "specs/api-design.md",
+    "specs/data-model.md",
+    "specs/implementation-plan.md",
+]
 
 # LLM configuration. Secrets must be provided by environment variables or .env,
 # never committed to the repository.

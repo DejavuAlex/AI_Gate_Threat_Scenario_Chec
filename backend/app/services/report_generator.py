@@ -120,14 +120,7 @@ def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: 
         lines.extend([f"- {control}" for control in controls])
     else:
         lines.append("- 无新增安全控制要求。")
-    lines.extend([
-        "", "## 6. Human Review", "",
-        "- Status: Pending",
-        "- Reviewer:",
-        "- Review Comment:",
-        "- Approved At:",
-        ""
-    ])
+    lines.extend(["", "## 6. Human Review", "", "- Status: Pending", "- Reviewer:", "- Review Comment:", "- Approved At:", ""])
     return "\n".join(lines)
 
 
@@ -144,15 +137,11 @@ def generate_gate2_report(review_id: str, work_order_id: str, request: Any, kb: 
     else:
         for item in match_result.get("matched_scenarios", []):
             lines.append(_scenario_markdown(item))
-    lines.extend([
-        "", "## 5. Gate1 Security Control Verification", "",
-        "| Control | Result | Evidence |",
-        "|---|---|---|",
-    ])
+    lines.extend(["", "## 5. Gate1 Security Control Verification", "", "| Control | Result | Evidence |", "|---|---|---|"])
     for item in verification.get("items", []):
         lines.append(f"| {item['control']} | {item['result']} | {item['evidence']} |")
-    lines.extend(["", "## 6. Non-compliance Findings", ""])
     findings = [item for item in verification.get("items", []) if item["result"] != "Implemented"]
+    lines.extend(["", "## 6. Non-compliance Findings", ""])
     if findings:
         for item in findings:
             lines.append(f"- {item['control']}: {item['result']}，建议补充到 Gate2 需求文档。")

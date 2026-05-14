@@ -2,8 +2,6 @@ import json
 import re
 from typing import Any
 
-from openai import OpenAI
-
 from .. import config
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
@@ -30,7 +28,11 @@ class LLMClient:
     def is_available(self) -> bool:
         return bool(self.enabled and self.provider == "openai" and self.api_key and self.base_url and self.model)
 
-    def _client(self) -> OpenAI:
+    def _client(self) -> Any:
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise RuntimeError("The installed openai package does not provide OpenAI. Install dependencies with: pip install -r requirements-dev.txt") from exc
         return OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout)
 
     @staticmethod
@@ -60,8 +62,6 @@ class LLMClient:
                 response_format={"type": "json_object"},
             )
         except Exception:
-            # Some enterprise gateways may not support response_format. Retry
-            # without it and still enforce JSON parsing locally.
             response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,

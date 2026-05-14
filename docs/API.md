@@ -19,6 +19,7 @@ task_code: TASK-000001
 3. 如果 Gate1 无安全风险：task 结束，final_result = no_security_risk
 4. 如果 Gate1 有安全风险：自动触发 Gate2，Gate2 继承 Gate1 的产品、版本、task、repo、branch、threshold 等参数
 5. Gate2 生成独立 report，人工 approve Gate2 后流程完成
+6. 可通过 task final report API 查看一次工单的最终汇总
 ```
 
 Task / activity/report 持久化：
@@ -142,6 +143,8 @@ GET /api/v1/tasks
 GET /api/v1/tasks?product_name=Demo%20Security%20Gate%20Product
 GET /api/v1/tasks?product_name=Demo%20Security%20Gate%20Product&product_version=v1.0.0
 GET /api/v1/tasks/{task_id}
+GET /api/v1/tasks/{task_id}/final-report
+GET /api/v1/tasks/{task_id}/final-report/download
 ```
 
 Task list items include:
@@ -163,6 +166,17 @@ latest_gate2_report_url
 latest_gate2_download_url
 approval
 auto_gate2
+```
+
+The final task report is an on-demand Markdown summary that includes:
+
+```text
+Task identity
+Workflow status
+Gate1/Gate2 approval summary
+Generated report links
+Gate run timeline
+References to detailed story-level scoring reports
 ```
 
 ## Work Order / Activity APIs
@@ -232,6 +246,14 @@ curl -X POST "http://localhost:18080/api/v1/ci/security-review/gate2/run" \
     "threshold":0.78,
     "triggered_by":"ci-cd"
   }'
+```
+
+## Final Report curl Example
+
+```bash
+curl "http://localhost:18080/api/v1/tasks/task-000001/final-report"
+
+curl -OJ "http://localhost:18080/api/v1/tasks/task-000001/final-report/download"
 ```
 
 ## Knowledge Base APIs

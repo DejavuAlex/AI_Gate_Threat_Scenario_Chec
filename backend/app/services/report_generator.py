@@ -40,11 +40,15 @@ def _scenario_markdown(item: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _metadata_lines(review_id: str, work_order_id: str, request: Any, gate: str, review_type: str, kb_label: str, kb: dict[str, Any]) -> list[str]:
+def _metadata_lines(review_id: str, work_order_id: str, request: Any, gate: str, review_type: str, kb_label: str, kb: dict[str, Any], task_meta: dict[str, Any] | None = None) -> list[str]:
+    task_meta = task_meta or {}
     return [
         "## 1. Review Metadata",
         "",
-        f"- Work Order ID: {work_order_id}",
+        f"- Task Serial No: {task_meta.get('task_serial_no', '')}",
+        f"- Task Code: {task_meta.get('task_code', '')}",
+        f"- Task Name: {task_meta.get('task_name', '')}",
+        f"- Work Order / Activity ID: {work_order_id}",
         f"- Review ID: {review_id}",
         f"- Product Name: {request.product_name}",
         f"- Product Version: {request.product_version}",
@@ -62,29 +66,62 @@ def _metadata_lines(review_id: str, work_order_id: str, request: Any, gate: str,
     ]
 
 
-def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any]) -> str:
-    lines = ["# Security Review Gate1 Report", ""]
-    lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate1", "Business Requirement Security Review", "Knowledge Base Version", kb))
-    lines.extend(["## 2. Input Documents", ""])
-    lines.extend([f"- {doc}" for doc in request.documents])
-    lines.extend(["", "## 3. Matching Result", ""])
-    if not match_result.get("matched"):
-        lines.extend([match_result.get("unmatched_message", "未匹配上任何威胁场景，本次安全评估确认无安全风险。"), ""])
-    else:
-        lines.append("### 3.1 Matched Threat Scenarios")
+def _story_assessments_markdown(match_result: dict[str, Any]) -> list[str]:
+    lines = ["", "## 3. Story-by-Story Threat Scenario Assessment", ""]
+    story_assessments = match_result.get("story_assessments", [])
+    if not story_assessments:
+        lines.append("- No story-level assessment data available.")
+        return lines
+    for story in story_assessments:
+        lines.extend([
+            f"### {story.get('story_id')} - {story.get('title')}",
+            "",
+            f"- Source Document: {story.get('document_path')}",
+            f"- Story Matched: {'Yes' if story.get('matched') else 'No'}",
+            "",
+            "| Scenario ID | Scenario Name | Matched | Final Score | Semantic | Keyword | Context | Negative Adj. | Risk |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---|",
+        ])
+        for item in story.get("top_scenarios", []):
+            sb = item.get("score_breakdown", {})
+            lines.append(
+                f"| {item.get('scenario_id')} | {item.get('scenario_name')} | {'Yes' if item.get('matched') else 'No'} | "
+                f"{item.get('final_score')} | {sb.get('semantic_similarity')} | {sb.get('keyword_match')} | "
+                f"{sb.get('context')} | {sb.get('negative_evidence_adjustment')} | {item.get('risk_level') or ''} |"
+            )
         lines.append("")
-        for item in match_result.get("matched_scenarios", []):
-            lines.append(_scenario_markdown(item))
-    lines.extend(["", "## 4. Final Security Control Requirements", ""])
+    return lines
+
+
+def _final_controls(match_result: dict[str, Any]) -> list[str]:
     controls = []
     for item in match_result.get("matched_scenarios", []):
         controls.extend(item.get("optimized_security_controls") or item["scenario"].get("security_control_requirements", []))
+    return list(dict.fromkeys(controls))
+
+
+def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], task_meta: dict[str, Any] | None = None) -> str:
+    lines = ["# Security Review Gate1 Report", ""]
+    lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate1", "Business Requirement Security Review", "Knowledge Base Version", kb, task_meta))
+    lines.extend(["## 2. Input Documents", ""])
+    lines.extend([f"- {doc}" for doc in request.documents])
+    lines.extend(_story_assessments_markdown(match_result))
+    lines.extend(["", "## 4. Overall Matching Result", ""])
+    if not match_result.get("matched"):
+        lines.extend([match_result.get("unmatched_message", "未匹配上任何威胁场景，本次安全评估确认无安全风险。"), ""])
+    else:
+        lines.append("### 4.1 Matched Threat Scenarios")
+        lines.append("")
+        for item in match_result.get("matched_scenarios", []):
+            lines.append(_scenario_markdown(item))
+    lines.extend(["", "## 5. Final Security Control Requirements", ""])
+    controls = _final_controls(match_result)
     if controls:
-        lines.extend([f"- {control}" for control in dict.fromkeys(controls)])
+        lines.extend([f"- {control}" for control in controls])
     else:
         lines.append("- 无新增安全控制要求。")
     lines.extend([
-        "", "## 5. Human Review", "",
+        "", "## 6. Human Review", "",
         "- Status: Pending",
         "- Reviewer:",
         "- Review Comment:",
@@ -94,44 +131,43 @@ def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: 
     return "\n".join(lines)
 
 
-def generate_gate2_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], verification: dict[str, Any]) -> str:
+def generate_gate2_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], verification: dict[str, Any], task_meta: dict[str, Any] | None = None) -> str:
     lines = ["# Security Review Gate2 Report", ""]
-    lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate2", "Architecture and Technical Requirement Security Review", "Gate2 Knowledge Base Version", kb))
-    lines.extend([f"- Gate1 Report: {request.gate1_report or 'Auto latest report for the same product/version'}", ""])
+    lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate2", "Architecture and Technical Requirement Security Review", "Gate2 Knowledge Base Version", kb, task_meta))
+    lines.extend([f"- Gate1 Report: {request.gate1_report or 'Auto latest report for the same task'}", ""])
     lines.extend(["## 2. Input Documents", ""])
     lines.extend([f"- {doc}" for doc in request.documents])
-    lines.extend(["", "## 3. Gate2 Knowledge Base Matching Result", ""])
+    lines.extend(_story_assessments_markdown(match_result))
+    lines.extend(["", "## 4. Overall Gate2 Knowledge Base Matching Result", ""])
     if not match_result.get("matched"):
         lines.extend([match_result.get("unmatched_message", "未匹配上任何威胁场景，本次安全评估确认无安全风险。"), ""])
     else:
         for item in match_result.get("matched_scenarios", []):
             lines.append(_scenario_markdown(item))
     lines.extend([
-        "", "## 4. Gate1 Security Control Verification", "",
+        "", "## 5. Gate1 Security Control Verification", "",
         "| Control | Result | Evidence |",
         "|---|---|---|",
     ])
     for item in verification.get("items", []):
         lines.append(f"| {item['control']} | {item['result']} | {item['evidence']} |")
-    lines.extend(["", "## 5. Non-compliance Findings", ""])
+    lines.extend(["", "## 6. Non-compliance Findings", ""])
     findings = [item for item in verification.get("items", []) if item["result"] != "Implemented"]
     if findings:
         for item in findings:
             lines.append(f"- {item['control']}: {item['result']}，建议补充到 Gate2 需求文档。")
     else:
         lines.append("- 未发现 Gate1 控制措施未落实项。")
-    lines.extend(["", "## 6. Optimized Gate2 Requirement Updates", ""])
+    lines.extend(["", "## 7. Optimized Gate2 Requirement Updates", ""])
     for item in findings:
         lines.append(f"- 建议在架构/API/实现计划中增加：{item['control']}")
     if not findings:
         lines.append("- 暂无额外文档优化建议。")
-    lines.extend(["", "## 7. Final Security Control Requirements", ""])
-    controls = []
-    for item in match_result.get("matched_scenarios", []):
-        controls.extend(item.get("optimized_security_controls") or item["scenario"].get("security_control_requirements", []))
+    lines.extend(["", "## 8. Final Security Control Requirements", ""])
+    controls = _final_controls(match_result)
     if controls:
-        lines.extend([f"- {control}" for control in dict.fromkeys(controls)])
+        lines.extend([f"- {control}" for control in controls])
     else:
         lines.append("- 无新增安全控制要求。")
-    lines.extend(["", "## 8. Conclusion", "", "Gate2 review completed.", ""])
+    lines.extend(["", "## 9. Conclusion", "", "Gate2 review completed.", ""])
     return "\n".join(lines)

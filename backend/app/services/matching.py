@@ -69,8 +69,8 @@ class MatchingEngine:
                 evidence.append(f"命中指标：{indicator}")
         return evidence[:10]
 
-    def match(self, document_text: str, gate: str) -> dict[str, Any]:
-        results: list[MatchResult] = []
+    def evaluate_scenarios(self, document_text: str, gate: str, include_below_threshold: bool = False) -> list[dict[str, Any]]:
+        evaluated: list[dict[str, Any]] = []
         for scenario in self.kb.get("scenarios", []):
             semantic = self._semantic_similarity(document_text, scenario)
             keyword = self._keyword_match(document_text, scenario, gate)
@@ -98,31 +98,57 @@ class MatchingEngine:
             if negative == 0.0:
                 final = min(final, self.threshold - 0.01)
 
-            if final >= self.threshold:
-                results.append(MatchResult(
-                    scenario=scenario,
-                    final_score=round(final, 4),
-                    score_breakdown={
-                        "semantic_similarity": round(semantic, 4),
-                        "keyword_match": round(keyword, 4),
-                        "context": round(context, 4),
-                        "negative_evidence_adjustment": round(negative, 4),
-                        "llm_confidence": round(llm_confidence, 4),
-                    },
-                    matched_evidence=self._evidence(document_text, scenario),
-                ))
+            score_breakdown = {
+                "semantic_similarity": round(semantic, 4),
+                "keyword_match": round(keyword, 4),
+                "context": round(context, 4),
+                "negative_evidence_adjustment": round(negative, 4),
+                "llm_confidence": round(llm_confidence, 4),
+            }
+            final_score = round(final, 4)
+            matched = final_score >= self.threshold
+            if matched or include_below_threshold:
+                evaluated.append({
+                    "scenario": scenario,
+                    "scenario_id": scenario.get("id"),
+                    "scenario_name": scenario.get("name"),
+                    "risk_level": scenario.get("risk", {}).get("level"),
+                    "risk": scenario.get("risk", {}),
+                    "matched": matched,
+                    "final_score": final_score,
+                    "score_breakdown": score_breakdown,
+                    "matched_evidence": self._evidence(document_text, scenario),
+                })
+        evaluated.sort(key=lambda item: item["final_score"], reverse=True)
+        return evaluated
 
-        results.sort(key=lambda item: item.final_score, reverse=True)
+    def assess_stories(self, stories: list[dict[str, str]], gate: str, top_n: int = 8) -> list[dict[str, Any]]:
+        assessments = []
+        for story in stories:
+            evaluated = self.evaluate_scenarios(story.get("content", ""), gate, include_below_threshold=True)
+            matched = [item for item in evaluated if item["matched"]]
+            assessments.append({
+                "story_id": story.get("story_id"),
+                "title": story.get("title"),
+                "document_path": story.get("document_path"),
+                "matched": bool(matched),
+                "top_scenarios": evaluated[:top_n],
+                "matched_scenarios": matched,
+            })
+        return assessments
+
+    def match(self, document_text: str, gate: str) -> dict[str, Any]:
+        evaluated = self.evaluate_scenarios(document_text, gate, include_below_threshold=False)
         return {
-            "matched": bool(results),
+            "matched": bool(evaluated),
             "matched_scenarios": [
                 {
-                    "scenario": r.scenario,
-                    "final_score": r.final_score,
-                    "score_breakdown": r.score_breakdown,
-                    "matched_evidence": r.matched_evidence,
+                    "scenario": item["scenario"],
+                    "final_score": item["final_score"],
+                    "score_breakdown": item["score_breakdown"],
+                    "matched_evidence": item["matched_evidence"],
                 }
-                for r in results
+                for item in evaluated
             ],
-            "unmatched_message": None if results else self.policy.get("unmatched_message", UNMATCHED_MESSAGE),
+            "unmatched_message": None if evaluated else self.policy.get("unmatched_message", UNMATCHED_MESSAGE),
         }

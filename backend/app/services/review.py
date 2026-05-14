@@ -61,9 +61,12 @@ class ReviewService:
         return TASKS_DIR / _slug(product_name) / _slug(product_version) / f"{task_id}.json"
 
     def _find_task_path(self, task_id: str) -> Path | None:
+        normalized = task_id.lower()
         for path in TASKS_DIR.glob("**/*.json"):
             item = _read_json(path)
-            if item and item.get("task_id") == task_id:
+            if item and item.get("task_id", "").lower() == normalized:
+                return path
+            if item and item.get("task_code", "").lower() == normalized:
                 return path
         return None
 
@@ -226,7 +229,7 @@ class ReviewService:
         report_path = REPO_ROOT / reports[0].get("report_path", "")
         return report_path if report_path.exists() else None
 
-    def _run_match(self, gate: str, request: ReviewRunRequest) -> tuple[dict, list[dict], str, list[dict]]:
+    def _run_match(self, gate: str, request: ReviewRunRequest) -> tuple[dict, list[dict], str, dict]:
         kb = self.kb_service.load(gate)
         document_text, docs = read_documents(request.documents)
         stories = extract_stories(docs)
@@ -411,6 +414,8 @@ class ReviewService:
                 "created_at": item.get("created_at"),
                 "updated_at": item.get("updated_at"),
                 "task_url": f"/api/v1/tasks/{item.get('task_id')}",
+                "final_report_url": f"/api/v1/tasks/{item.get('task_id')}/final-report",
+                "final_report_download_url": f"/api/v1/tasks/{item.get('task_id')}/final-report/download",
             })
         items.sort(key=lambda item: item.get("task_serial_no") or 0, reverse=True)
         return items

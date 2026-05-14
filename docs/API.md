@@ -2,46 +2,35 @@
 
 默认服务地址：`http://localhost:8000`。Docker/Podman 默认宿主机端口为 `18080`，即 `http://localhost:18080`。
 
-## Core Model: AI Gate Task
+## Review Flow
 
-当前版本采用 Task / Activity 模型：
-
-```text
-Product Name + Product Version = AI Gate Task
-Gate1 run = Task Activity
-Gate2 run = Task Activity
-Report edit / approve = Review activity audit event
-```
-
-默认 task id：
+一次安全评审工单以系统内部序列号标识：
 
 ```text
-task-{product_name_slug}-{product_version_slug}
+task_serial_no: 1, 2, 3...
+task_code: TASK-000001
 ```
 
-每次运行 Gate1/Gate2 都会创建独立 activity/work order，并保存独立报告文件，历史不会被覆盖。
-
-## Local Persistence
-
-Task metadata：
+默认流程：
 
 ```text
-data/tasks/{product_name_slug}/{product_version_slug}/{task_id}.json
+1. 下发 Gate1 review task
+2. 人工 approve Gate1 report
+3. 如果 Gate1 无安全风险：task 结束，final_result = no_security_risk
+4. 如果 Gate1 有安全风险：自动触发 Gate2，Gate2 继承 Gate1 的产品、版本、task、repo、branch、threshold 等参数
+5. Gate2 生成独立 report，人工 approve Gate2 后流程完成
 ```
 
-Activity / work order metadata：
+Task / activity/report 持久化：
 
 ```text
-data/work_orders/{product_name_slug}/{product_version_slug}/{task_id}/{activity_id}.json
+data/task_sequence.json
+data/tasks/{product}/{version}/{task_id}.json
+data/work_orders/{product}/{version}/{task_id}/{activity_id}.json
+reports/{product}/{version}/{task_id}/{activity_id}/Security-Review-*.md
 ```
 
-Reports：
-
-```text
-reports/{product_name_slug}/{product_version_slug}/{task_id}/{activity_id}/Security-Review-*.md
-```
-
-## Health / Dashboard / Catalog
+## Dashboard / Catalog
 
 ```http
 GET /api/v1/health
@@ -49,24 +38,18 @@ GET /api/v1/dashboard/stats
 GET /api/v1/catalog
 ```
 
-`/catalog` 用于 UI 下拉框，返回产品、版本、Task 列表。
-
-## Gate1 Review Activity
+## Gate1 API
 
 ```http
 POST /api/v1/security-review/gate1/run
 Content-Type: application/json
 ```
 
-请求示例：
-
 ```json
 {
   "project_id": "demo",
   "product_name": "Demo Security Gate Product",
   "product_version": "v1.0.0",
-  "task_id": "task-demo-security-gate-product-v1.0.0",
-  "task_name": "Demo Security Gate Product v1.0.0 AI Gate Task",
   "repository": "quy7_roche/AI_Security_Gate",
   "branch": "main",
   "documents": [
@@ -74,42 +57,68 @@ Content-Type: application/json
     "specs/user-stories.md",
     "specs/business-flow.md"
   ],
+  "gate2_documents": [
+    "specs/architecture.md",
+    "specs/api-design.md",
+    "specs/data-model.md",
+    "specs/implementation-plan.md"
+  ],
   "threshold": 0.78,
-  "triggered_by": "ui"
+  "triggered_by": "ci",
+  "auto_run_gate2_on_gate1_approval": true
 }
 ```
 
-响应包含：
+## Gate1 Approve API
+
+```http
+POST /api/v1/security-review/gate1/{review_id}/approve
+POST /api/v1/reports/{review_id}/approve
+Content-Type: application/json
+```
 
 ```json
 {
-  "task_id": "task-demo-security-gate-product-v1.0.0",
-  "work_order_id": "act-task-demo-security-gate-product-v1.0.0-gate1-...",
-  "activity_id": "act-task-demo-security-gate-product-v1.0.0-gate1-...",
-  "review_id": "gate1-review-...",
-  "report_url": "/api/v1/reports/gate1-review-...",
-  "report_download_url": "/api/v1/reports/gate1-review-.../download",
-  "task_url": "/api/v1/tasks/task-demo-security-gate-product-v1.0.0"
+  "reviewer": "security.reviewer@example.com",
+  "comment": "Approved"
 }
 ```
 
-## Gate2 Review Activity
+响应中如果 `auto_gate2_triggered=true`，表示 Gate1 有风险且系统已经自动运行 Gate2：
+
+```json
+{
+  "auto_gate2_triggered": true,
+  "auto_gate2_result": {
+    "review_id": "gate2-review-...",
+    "report_url": "/api/v1/reports/gate2-review-...",
+    "report_download_url": "/api/v1/reports/gate2-review-.../download"
+  }
+}
+```
+
+## Gate2 Direct API
+
+Gate2 仍支持直接调用，适用于 UI、API 和外部服务：
 
 ```http
 POST /api/v1/security-review/gate2/run
 Content-Type: application/json
 ```
 
-如果 `gate1_report` 为空，系统会自动查找同一 `product_name + product_version + task_id` 下最新 Gate1 报告。
+CI/CD 友好别名：
 
-请求示例：
+```http
+POST /api/v1/ci/security-review/gate2/run
+Content-Type: application/json
+```
 
 ```json
 {
   "project_id": "demo",
   "product_name": "Demo Security Gate Product",
   "product_version": "v1.0.0",
-  "task_id": "task-demo-security-gate-product-v1.0.0",
+  "task_id": "task-000001",
   "repository": "quy7_roche/AI_Security_Gate",
   "branch": "main",
   "documents": [
@@ -118,11 +127,13 @@ Content-Type: application/json
     "specs/data-model.md",
     "specs/implementation-plan.md"
   ],
-  "gate1_report": null,
+  "gate1_report": "reports/.../Security-Review-Gate1-xxx.md",
   "threshold": 0.78,
-  "triggered_by": "ui"
+  "triggered_by": "ci-cd"
 }
 ```
+
+If `gate1_report` is omitted, the service tries to use the latest Gate1 report under the same task.
 
 ## Task APIs
 
@@ -133,12 +144,32 @@ GET /api/v1/tasks?product_name=Demo%20Security%20Gate%20Product&product_version=
 GET /api/v1/tasks/{task_id}
 ```
 
-## Activity / Work Order APIs
+Task list items include:
+
+```text
+task_serial_no
+task_code
+task_name
+product_name
+product_version
+flow_status
+final_result
+triggered_by
+latest_gate1_review_id
+latest_gate1_report_url
+latest_gate1_download_url
+latest_gate2_review_id
+latest_gate2_report_url
+latest_gate2_download_url
+approval
+auto_gate2
+```
+
+## Work Order / Activity APIs
 
 ```http
 GET /api/v1/work-orders
-GET /api/v1/work-orders?task_id=task-demo-security-gate-product-v1.0.0
-GET /api/v1/work-orders?product_name=Demo%20Security%20Gate%20Product&product_version=v1.0.0&task_id=task-demo-security-gate-product-v1.0.0
+GET /api/v1/work-orders?task_id=task-000001
 GET /api/v1/work-orders/{work_order_id}
 ```
 
@@ -149,29 +180,58 @@ GET /api/v1/reports/{review_id}
 GET /api/v1/reports/{review_id}/download
 PUT /api/v1/reports/{review_id}
 POST /api/v1/reports/{review_id}/approve
+POST /api/v1/security-review/gate2/{review_id}/approve
 ```
 
-`GET /api/v1/reports/{review_id}` 返回 Markdown 文本，用于浏览器查看。
+## CLI Examples
 
-`GET /api/v1/reports/{review_id}/download` 以 Markdown 文件方式下载报告。
+Gate1 with Gate2 documents for auto-run:
 
-`PUT /api/v1/reports/{review_id}` 示例：
-
-```json
-{
-  "content": "# Security Review Gate1 Report\n...",
-  "reviewer": "security.reviewer@example.com",
-  "comment": "Manual update"
-}
+```bash
+python cli/security_gate_cli.py gate1 run \
+  --product-name "Demo Security Gate Product" \
+  --product-version "v1.0.0" \
+  --docs specs/product-requirements.md specs/user-stories.md specs/business-flow.md \
+  --gate2-docs specs/architecture.md specs/api-design.md specs/data-model.md specs/implementation-plan.md
 ```
 
-`POST /api/v1/reports/{review_id}/approve` 示例：
+Approve Gate1 and auto-run Gate2 if risk exists:
 
-```json
-{
-  "reviewer": "security.reviewer@example.com",
-  "comment": "Approved"
-}
+```bash
+python cli/security_gate_cli.py approve \
+  --review-id gate1-review-xxx \
+  --reviewer security.reviewer@example.com \
+  --comment "Approved"
+```
+
+Direct Gate2:
+
+```bash
+python cli/security_gate_cli.py gate2 run \
+  --product-name "Demo Security Gate Product" \
+  --product-version "v1.0.0" \
+  --task-id task-000001 \
+  --docs specs/architecture.md specs/api-design.md specs/data-model.md specs/implementation-plan.md \
+  --gate1-report reports/.../Security-Review-Gate1-xxx.md \
+  --triggered-by ci
+```
+
+## CI/CD curl Example
+
+```bash
+curl -X POST "http://localhost:18080/api/v1/ci/security-review/gate2/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id":"demo",
+    "product_name":"Demo Security Gate Product",
+    "product_version":"v1.0.0",
+    "task_id":"task-000001",
+    "repository":"quy7_roche/AI_Security_Gate",
+    "branch":"main",
+    "documents":["specs/architecture.md","specs/api-design.md","specs/data-model.md","specs/implementation-plan.md"],
+    "threshold":0.78,
+    "triggered_by":"ci-cd"
+  }'
 ```
 
 ## Knowledge Base APIs
@@ -182,28 +242,8 @@ PUT /api/v1/knowledge-base/{gate}
 GET /api/v1/knowledge-base/{gate}/history
 ```
 
-其中 `{gate}` 为 `gate1` 或 `gate2`。
-
-知识库更新只能由人工 UI/API 调用，评审引擎不会修改知识库。每次人工修改都会保存一条历史记录到：
+每次人工更新知识库都会保存历史记录：
 
 ```text
 data/knowledge_base_history/{gate}/
-```
-
-知识库更新示例：
-
-```json
-{
-  "version": "1.0.1",
-  "updated_by": "security.admin@example.com",
-  "change_reason": "Manual update from UI/API",
-  "content": {
-    "schema_version": "1.0.0",
-    "knowledge_base_version": "1.0.1",
-    "gate": "Gate1",
-    "llm_editable": false,
-    "matching_policy": {},
-    "scenarios": []
-  }
-}
 ```

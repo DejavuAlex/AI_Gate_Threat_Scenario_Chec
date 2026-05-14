@@ -12,9 +12,10 @@ DATA_DIR = REPO_ROOT / "data"
 SPECS_DIR = REPO_ROOT / "specs"
 REVIEWS_DIR = DATA_DIR / "reviews"
 WORK_ORDERS_DIR = DATA_DIR / "work_orders"
+TASKS_DIR = DATA_DIR / "tasks"
 KB_HISTORY_DIR = DATA_DIR / "knowledge_base_history"
 
-for directory in (REPORTS_DIR, DATA_DIR, SPECS_DIR, REVIEWS_DIR, WORK_ORDERS_DIR, KB_HISTORY_DIR):
+for directory in (REPORTS_DIR, DATA_DIR, SPECS_DIR, REVIEWS_DIR, WORK_ORDERS_DIR, TASKS_DIR, KB_HISTORY_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_THRESHOLD = 0.78

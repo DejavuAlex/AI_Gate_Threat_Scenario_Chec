@@ -15,6 +15,16 @@ def health():
     return {"status": "ok"}
 
 
+@router.get("/dashboard/stats")
+def dashboard_stats():
+    return review_service.dashboard_stats()
+
+
+@router.get("/catalog")
+def catalog():
+    return review_service.catalog()
+
+
 @router.post("/security-review/gate1/run")
 def run_gate1(request: ReviewRunRequest):
     return review_service.run("gate1", request)
@@ -25,11 +35,26 @@ def run_gate2(request: ReviewRunRequest):
     return review_service.run("gate2", request)
 
 
+@router.get("/tasks")
+def list_tasks(product_name: str | None = Query(default=None), product_version: str | None = Query(default=None)):
+    return {"items": review_service.list_tasks(product_name=product_name, product_version=product_version)}
+
+
+@router.get("/tasks/{task_id}")
+def get_task(task_id: str):
+    try:
+        return review_service.get_task(task_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="task not found")
+
+
 @router.get("/work-orders")
-def list_work_orders(product_name: str | None = Query(default=None), product_version: str | None = Query(default=None)):
-    return {
-        "items": review_service.list_work_orders(product_name=product_name, product_version=product_version)
-    }
+def list_work_orders(
+    product_name: str | None = Query(default=None),
+    product_version: str | None = Query(default=None),
+    task_id: str | None = Query(default=None),
+):
+    return {"items": review_service.list_work_orders(product_name=product_name, product_version=product_version, task_id=task_id)}
 
 
 @router.get("/work-orders/{work_order_id}")

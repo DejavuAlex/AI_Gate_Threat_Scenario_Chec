@@ -6,6 +6,8 @@ class ReviewRunRequest(BaseModel):
     project_id: str = "demo"
     product_name: str = "Demo Security Gate Product"
     product_version: str = "v1.0.0"
+    task_id: str | None = None
+    task_name: str | None = None
     repository: str | None = None
     branch: str | None = None
     documents: list[str] = Field(default_factory=list)
@@ -43,6 +45,7 @@ class MatchedScenario(BaseModel):
 class ReviewResponse(BaseModel):
     review_id: str
     work_order_id: str
+    task_id: str
     product_name: str
     product_version: str
     gate: Literal["gate1", "gate2"]
@@ -53,4 +56,5 @@ class ReviewResponse(BaseModel):
     report_url: str
     report_download_url: str
     work_order_url: str
+    task_url: str
     approval_status: str = "pending"

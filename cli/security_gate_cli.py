@@ -17,6 +17,8 @@ def run_gate(gate: str, args: argparse.Namespace) -> int:
         project_id=args.project_id,
         product_name=args.product_name,
         product_version=args.product_version,
+        task_id=args.task_id,
+        task_name=args.task_name,
         repository=args.repo,
         branch=args.branch,
         documents=args.docs,
@@ -26,7 +28,8 @@ def run_gate(gate: str, args: argparse.Namespace) -> int:
     )
     result = ReviewService().run(gate, request)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    print(f"\nWork order: {result['work_order_id']}")
+    print(f"\nTask: {result['task_id']}")
+    print(f"Activity: {result['work_order_id']}")
     print(f"Report generated: {result['report_path']}")
     print(f"Report URL: {result['report_url']}")
     print(f"Download URL: {result['report_download_url']}")
@@ -44,6 +47,8 @@ def main() -> int:
         run.add_argument("--project-id", default="demo")
         run.add_argument("--product-name", default="Demo Security Gate Product")
         run.add_argument("--product-version", default="v1.0.0")
+        run.add_argument("--task-id", default=None, help="Optional stable task id. Defaults to product+version task.")
+        run.add_argument("--task-name", default=None)
         run.add_argument("--repo", default="quy7_roche/AI_Security_Gate")
         run.add_argument("--branch", default="main")
         run.add_argument("--docs", nargs="+", required=True)

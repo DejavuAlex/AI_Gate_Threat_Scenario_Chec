@@ -2,36 +2,56 @@
 
 默认服务地址：`http://localhost:8000`。Docker/Podman 默认宿主机端口为 `18080`，即 `http://localhost:18080`。
 
-## Health
+## Core Model: AI Gate Task
+
+当前版本采用 Task / Activity 模型：
+
+```text
+Product Name + Product Version = AI Gate Task
+Gate1 run = Task Activity
+Gate2 run = Task Activity
+Report edit / approve = Review activity audit event
+```
+
+默认 task id：
+
+```text
+task-{product_name_slug}-{product_version_slug}
+```
+
+每次运行 Gate1/Gate2 都会创建独立 activity/work order，并保存独立报告文件，历史不会被覆盖。
+
+## Local Persistence
+
+Task metadata：
+
+```text
+data/tasks/{product_name_slug}/{product_version_slug}/{task_id}.json
+```
+
+Activity / work order metadata：
+
+```text
+data/work_orders/{product_name_slug}/{product_version_slug}/{task_id}/{activity_id}.json
+```
+
+Reports：
+
+```text
+reports/{product_name_slug}/{product_version_slug}/{task_id}/{activity_id}/Security-Review-*.md
+```
+
+## Health / Dashboard / Catalog
 
 ```http
 GET /api/v1/health
+GET /api/v1/dashboard/stats
+GET /api/v1/catalog
 ```
 
-## Review Work Order Model
+`/catalog` 用于 UI 下拉框，返回产品、版本、Task 列表。
 
-每次触发 Gate1/Gate2 都会创建一个独立评审工单，按产品名称和产品版本分类保存：
-
-- `product_name`：产品名称
-- `product_version`：产品版本
-- `work_order_id`：系统生成的工单 ID
-- `review_id`：系统生成的单次 review ID
-- `report_url`：报告查看链接
-- `report_download_url`：报告下载链接
-
-工单元数据保存到：
-
-```text
-data/work_orders/{product_name_slug}/{product_version_slug}/{work_order_id}.json
-```
-
-报告保存到：
-
-```text
-reports/{product_name_slug}/{product_version_slug}/{work_order_id}/Security-Review-*.md
-```
-
-## Gate1 Review
+## Gate1 Review Activity
 
 ```http
 POST /api/v1/security-review/gate1/run
@@ -45,6 +65,8 @@ Content-Type: application/json
   "project_id": "demo",
   "product_name": "Demo Security Gate Product",
   "product_version": "v1.0.0",
+  "task_id": "task-demo-security-gate-product-v1.0.0",
+  "task_name": "Demo Security Gate Product v1.0.0 AI Gate Task",
   "repository": "quy7_roche/AI_Security_Gate",
   "branch": "main",
   "documents": [
@@ -53,36 +75,32 @@ Content-Type: application/json
     "specs/business-flow.md"
   ],
   "threshold": 0.78,
-  "triggered_by": "ci"
+  "triggered_by": "ui"
 }
 ```
 
-响应示例：
+响应包含：
 
 ```json
 {
-  "work_order_id": "wo-demo-security-gate-product-v1.0.0-gate1-...",
+  "task_id": "task-demo-security-gate-product-v1.0.0",
+  "work_order_id": "act-task-demo-security-gate-product-v1.0.0-gate1-...",
+  "activity_id": "act-task-demo-security-gate-product-v1.0.0-gate1-...",
   "review_id": "gate1-review-...",
-  "product_name": "Demo Security Gate Product",
-  "product_version": "v1.0.0",
-  "gate": "gate1",
-  "status": "completed",
-  "matched": true,
-  "report_path": "reports/demo-security-gate-product/v1.0.0/.../Security-Review-Gate1-....md",
   "report_url": "/api/v1/reports/gate1-review-...",
   "report_download_url": "/api/v1/reports/gate1-review-.../download",
-  "work_order_url": "/api/v1/work-orders/wo-demo-security-gate-product-v1.0.0-gate1-..."
+  "task_url": "/api/v1/tasks/task-demo-security-gate-product-v1.0.0"
 }
 ```
 
-## Gate2 Review
+## Gate2 Review Activity
 
 ```http
 POST /api/v1/security-review/gate2/run
 Content-Type: application/json
 ```
 
-如果 `gate1_report` 为空，系统会自动查找同一 `product_name + product_version` 下最新 Gate1 报告。
+如果 `gate1_report` 为空，系统会自动查找同一 `product_name + product_version + task_id` 下最新 Gate1 报告。
 
 请求示例：
 
@@ -91,6 +109,7 @@ Content-Type: application/json
   "project_id": "demo",
   "product_name": "Demo Security Gate Product",
   "product_version": "v1.0.0",
+  "task_id": "task-demo-security-gate-product-v1.0.0",
   "repository": "quy7_roche/AI_Security_Gate",
   "branch": "main",
   "documents": [
@@ -101,16 +120,25 @@ Content-Type: application/json
   ],
   "gate1_report": null,
   "threshold": 0.78,
-  "triggered_by": "ci"
+  "triggered_by": "ui"
 }
 ```
 
-## Work Order APIs
+## Task APIs
+
+```http
+GET /api/v1/tasks
+GET /api/v1/tasks?product_name=Demo%20Security%20Gate%20Product
+GET /api/v1/tasks?product_name=Demo%20Security%20Gate%20Product&product_version=v1.0.0
+GET /api/v1/tasks/{task_id}
+```
+
+## Activity / Work Order APIs
 
 ```http
 GET /api/v1/work-orders
-GET /api/v1/work-orders?product_name=Demo%20Security%20Gate%20Product
-GET /api/v1/work-orders?product_name=Demo%20Security%20Gate%20Product&product_version=v1.0.0
+GET /api/v1/work-orders?task_id=task-demo-security-gate-product-v1.0.0
+GET /api/v1/work-orders?product_name=Demo%20Security%20Gate%20Product&product_version=v1.0.0&task_id=task-demo-security-gate-product-v1.0.0
 GET /api/v1/work-orders/{work_order_id}
 ```
 

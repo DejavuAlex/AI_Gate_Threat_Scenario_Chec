@@ -51,12 +51,18 @@ class MatchingEngine:
             indicators = scenario.get("business_indicators", []) + scenario.get("technical_indicators", [])
         if not indicators:
             return 0.0
-        return min(1.0, contains_any(document_text, indicators) / max(1, min(3, len(indicators))))
+        matched_count = contains_any(document_text, indicators)
+        if matched_count <= 0:
+            return 0.0
+        # A single explicit business/technical indicator such as "文件上传" is
+        # strong evidence for the scenario. Additional indicators increase
+        # confidence but are not required for deterministic matching.
+        return min(1.0, matched_count / max(1, min(2, len(indicators))))
 
     def _context_score(self, document_text: str, scenario: dict[str, Any]) -> float:
         evidence_count = contains_any(document_text, scenario.get("risk_identification", []) + scenario.get("security_control_requirements", []))
         indicator_count = contains_any(document_text, scenario.get("business_indicators", []) + scenario.get("technical_indicators", []))
-        return min(1.0, (indicator_count * 0.3) + (evidence_count * 0.2))
+        return min(1.0, (indicator_count * 0.35) + (evidence_count * 0.25))
 
     def _negative_adjustment(self, document_text: str, scenario: dict[str, Any]) -> float:
         negatives = scenario.get("negative_indicators", [])
@@ -92,8 +98,15 @@ class MatchingEngine:
                 + negative * 0.05
                 + llm_confidence * self.weights.get("llm_confidence", 0.1)
             )
+
         if negative == 0.0:
             final = min(final, self.threshold - 0.01)
+        elif keyword >= 0.5 and self._evidence(document_text, scenario):
+            # Deterministic exact-indicator matches should clear the configured
+            # gate threshold even when semantic token overlap is low for Chinese
+            # prose segmentation. Negative indicators above still veto this.
+            final = max(final, self.threshold)
+
         return MatchResult(
             scenario=scenario,
             final_score=round(final, 4),

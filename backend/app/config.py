@@ -28,6 +28,12 @@ DEFAULT_GATE2_DOCUMENTS = [
     "specs/implementation-plan.md",
 ]
 
+# API authentication. If AI_SECURITY_GATE_API_KEY is set, every /api/v1
+# endpoint requires either X-API-Key: <key> or Authorization: Bearer <key>.
+# Static UI assets remain public so users can open the console and configure
+# their API key in the Global Configuration page.
+AI_SECURITY_GATE_API_KEY = os.getenv("AI_SECURITY_GATE_API_KEY", "")
+
 # LLM configuration. Secrets must be provided by environment variables or .env,
 # never committed to the repository.
 AI_LLM_ENABLED = os.getenv("AI_LLM_ENABLED", "false").lower() in {"1", "true", "yes", "on"}

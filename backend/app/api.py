@@ -1,11 +1,28 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
+from . import config
 from .schemas import ApproveRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
 from .services.knowledge_base import KnowledgeBaseService
 from .services.review import ReviewService
 
-router = APIRouter()
+
+def require_api_key(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    authorization: str | None = Header(default=None),
+):
+    expected = config.AI_SECURITY_GATE_API_KEY
+    if not expected:
+        return
+    bearer_token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        bearer_token = authorization.split(" ", 1)[1].strip()
+    if x_api_key == expected or bearer_token == expected:
+        return
+    raise HTTPException(status_code=401, detail="invalid or missing API key")
+
+
+router = APIRouter(dependencies=[Depends(require_api_key)])
 review_service = ReviewService()
 kb_service = KnowledgeBaseService()
 

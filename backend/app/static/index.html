@@ -18,7 +18,7 @@
     main { padding:22px; overflow:auto; }
     .topbar { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:18px; }
     h2 { margin:0; } h3 { margin:0 0 12px; }
-    .subtitle,.muted { color:var(--muted); }
+    .muted { color:var(--muted); }
     .small { font-size:12px; }
     .tab { display:none; } .tab.active { display:block; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
@@ -32,7 +32,7 @@
     button.ok { background:var(--ok); color:#03210d; }
     button.warn { background:var(--warn); color:#261300; }
     button.inline { margin:0 4px 4px 0; padding:7px 9px; font-size:12px; }
-    pre { background:#020617; color:#d1d5db; border:1px solid var(--line); border-radius:10px; padding:12px; white-space:pre-wrap; overflow:auto; max-height:360px; }
+    pre { background:#020617; color:#d1d5db; border:1px solid var(--line); border-radius:10px; padding:12px; white-space:pre-wrap; overflow:auto; max-height:520px; }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
@@ -53,20 +53,20 @@
 <body>
 <div class="app">
   <aside>
-    <div class="brand"><h1>AI Security Gate</h1><p>一次产品版本安全评审 = 一个带系统序列号的 Review Task</p></div>
+    <div class="brand"><h1>AI Security Gate</h1><p>AI驱动的安全评审威胁建模</p></div>
     <div class="nav">
       <button class="active" onclick="showTab('dashboard', this)">Dashboard</button>
-      <button onclick="showTab('newTask', this)">下发 / 调用 Review</button>
+      <button onclick="showTab('newTask', this)">Threat Modeling Review</button>
       <button onclick="showTab('taskList', this)">AI Gate Task List</button>
       <button onclick="showTab('reports', this)">Report Review</button>
       <button onclick="showTab('kb', this)">金标准知识库</button>
-      <button onclick="showTab('apiHelp', this)">API / CI / CLI</button>
+      <button onclick="showTab('apiHelp', this)">全局配置</button>
     </div>
   </aside>
 
   <main>
     <div class="topbar">
-      <div><h2 id="pageTitle">Dashboard</h2><div class="subtitle">Gate1 approve 后按风险自动结束或触发 Gate2；Task List 展示完整单次安全评审工单。</div></div>
+      <div><h2 id="pageTitle">Dashboard</h2></div>
       <div class="row"><button class="secondary" onclick="refreshAll()">Refresh</button><button class="secondary" onclick="health()">Health</button></div>
     </div>
 
@@ -77,14 +77,14 @@
         <div class="metric"><div class="num" id="mReport">0</div><div class="label">Reports</div></div>
         <div class="metric"><div class="num" id="mApproved">0</div><div class="label">Approved</div></div>
       </div>
-      <div class="card" style="margin-top:16px"><h3>最新 Review Task</h3><div class="tableWrap"><table><thead><tr><th>Code</th><th>Product / Version</th><th>Flow</th><th>Reports</th><th>Updated</th></tr></thead><tbody id="latestTasksBody"></tbody></table></div></div>
+      <div class="card" style="margin-top:16px"><h3>最新 Review Task</h3><div class="tableWrap"><table><thead><tr><th>Code</th><th>Product / Version</th><th>Flow</th><th>Updated</th><th>Reports</th></tr></thead><tbody id="latestTasksBody"></tbody></table></div></div>
       <pre id="healthOut">等待检查...</pre>
     </section>
 
     <section id="newTask" class="tab">
       <div class="grid">
         <div class="card">
-          <h3>下发 Gate1 Review Task</h3>
+          <h3>Gate1 Review</h3>
           <div class="two"><div><label>Product Name</label><input id="g1Product" value="Demo Security Gate Product"></div><div><label>Product Version</label><input id="g1Version" value="v1.0.0"></div></div>
           <div class="three"><div><label>Project ID</label><input id="g1Project" value="demo"></div><div><label>Repository</label><input id="g1Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g1Branch" value="main"></div></div>
           <label>Gate1 Requirement Documents</label><textarea id="g1Docs">specs/product-requirements.md
@@ -100,8 +100,8 @@ specs/implementation-plan.md</textarea>
         </div>
 
         <div class="card">
-          <h3>Gate2 Direct Call</h3>
-          <div class="note">用于 API / CI/CD / CLI 直接触发 Gate2。若 task_id 与 gate1_report 留空，将作为独立 Gate2 评审运行。</div>
+          <h3>Gate2 Review</h3>
+          <div class="note">若 task_id 与 gate1_report 留空，将作为独立 Gate2 评审运行。</div>
           <div class="two"><div><label>Product Name</label><input id="g2Product" value="Demo Security Gate Product"></div><div><label>Product Version</label><input id="g2Version" value="v1.0.0"></div></div>
           <label>Existing Task ID / Code</label><input id="g2TaskId" placeholder="例如 task-xxx 或 TASK-000001，可留空">
           <div class="three"><div><label>Project ID</label><input id="g2Project" value="demo"></div><div><label>Repository</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g2Branch" value="main"></div></div>
@@ -111,7 +111,7 @@ specs/data-model.md
 specs/implementation-plan.md</textarea>
           <label>Gate1 Report Path（可留空：同 task 下自动查找最新 Gate1 report）</label><input id="g2Gate1Report" value="">
           <div class="two"><div><label>Threshold</label><input id="g2Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g2TriggeredBy" value="ui-direct-gate2"></div></div>
-          <button onclick="runGate2()">Run Gate2 Directly</button>
+          <button onclick="runGate2()">Run Gate2</button>
           <pre id="g2Out">等待运行...</pre>
         </div>
       </div>
@@ -119,7 +119,7 @@ specs/implementation-plan.md</textarea>
 
     <section id="taskList" class="tab">
       <div class="card">
-        <h3>AI Gate Task List / Review 工单详情</h3>
+        <h3>Review工单详情</h3>
         <div class="three"><div><label>Product</label><select id="filterProduct"></select></div><div><label>Version</label><select id="filterVersion"></select></div><div><label>Task</label><select id="filterTask"></select></div></div>
         <div class="row"><button onclick="loadTasks()">Search</button><button class="secondary" onclick="clearFilters()">Show All</button></div>
         <div class="tableWrap"><table><thead><tr><th>Serial / Code</th><th>Product / Version</th><th>Task Name</th><th>Flow / Result</th><th>Gate1</th><th>Gate2</th><th>Approval / Trigger</th><th>Auto Gate2</th><th>Final</th><th>Action</th></tr></thead><tbody id="tasksBody"></tbody></table></div>
@@ -129,7 +129,6 @@ specs/implementation-plan.md</textarea>
 
     <section id="reports" class="tab">
       <div class="card">
-        <h3>Report Review / Approve</h3>
         <div class="three"><div><label>Task</label><select id="reportTask" onchange="onReportTaskChange()"></select></div><div><label>Review ID</label><select id="reportReview" onchange="onReviewSelect()"></select></div><div><label>Reviewer</label><input id="reviewer" value="security.reviewer@example.com"></div></div>
         <div class="row"><button class="secondary" onclick="openReport()">Open</button><button class="secondary" onclick="downloadReport()">Download</button><button class="secondary" onclick="loadReportForEdit()">Load for Edit</button><button onclick="saveReport()">Save Edited Report</button><button class="ok" onclick="approveSelectedReport()">Approve</button></div>
         <label>Report Content</label><textarea id="reportContent" style="min-height:360px"></textarea>
@@ -142,27 +141,117 @@ specs/implementation-plan.md</textarea>
     </section>
 
     <section id="apiHelp" class="tab">
-      <div class="card"><h3>API / CI / CLI Quick Reference</h3><pre>Gate1 API:
+      <div class="grid">
+        <div class="card">
+          <h3>API Key</h3>
+          <div class="note">后端设置 AI_SECURITY_GATE_API_KEY 后，所有 /api/v1 接口都需要认证。UI 会把下方 API Key 保存在浏览器 localStorage 中，并随请求发送 X-API-Key。</div>
+          <label>当前浏览器 API Key</label><input id="uiApiKey" type="password" placeholder="输入 AI_SECURITY_GATE_API_KEY">
+          <div class="row"><button onclick="saveUiApiKey()">保存 API Key</button><button class="secondary" onclick="clearUiApiKey()">清除</button></div>
+          <pre id="apiKeyOut">未保存</pre>
+        </div>
+        <div class="card">
+          <h3>服务端环境配置</h3>
+          <pre>AI_SECURITY_GATE_API_KEY=replace-with-your-api-key
+AI_LLM_ENABLED=false
+AI_PROVIDER=openai
+OPENAI_MODEL=gpt-5-2025-08-07
+OPENAI_BASE_URL=https://eu.aigw.galileo.roche.com/v1
+OPENAI_API_KEY=replace-with-your-secret-key
+LLM_MATCHING_TEMPERATURE=0
+LLM_MATCHING_TIMEOUT_SECONDS=60</pre>
+        </div>
+      </div>
+      <div class="grid" style="margin-top:16px">
+        <div class="card"><h3>Gate1 调用方式</h3><pre>UI:
+Threat Modeling Review -> Gate1 Review -> Run Gate1
+
+API:
 POST /api/v1/security-review/gate1/run
+Headers:
+  Content-Type: application/json
+  X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
 
-Gate1 Approve with auto Gate2:
-POST /api/v1/security-review/gate1/{review_id}/approve
+curl:
+curl -X POST "http://localhost:18080/api/v1/security-review/gate1/run" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;" \
+  -d '{
+    "project_id":"demo",
+    "product_name":"Demo Security Gate Product",
+    "product_version":"v1.0.0",
+    "repository":"quy7_roche/AI_Security_Gate",
+    "branch":"main",
+    "documents":["specs/product-requirements.md","specs/user-stories.md","specs/business-flow.md"],
+    "gate2_documents":["specs/architecture.md","specs/api-design.md","specs/data-model.md","specs/implementation-plan.md"],
+    "threshold":0.78,
+    "triggered_by":"api",
+    "auto_run_gate2_on_gate1_approval":true
+  }'
 
-Gate2 direct API:
+CLI:
+python cli/security_gate_cli.py gate1 run \
+  --product-name "Demo Security Gate Product" \
+  --product-version "v1.0.0" \
+  --docs specs/product-requirements.md specs/user-stories.md specs/business-flow.md \
+  --gate2-docs specs/architecture.md specs/api-design.md specs/data-model.md specs/implementation-plan.md</pre></div>
+        <div class="card"><h3>Gate2 调用方式</h3><pre>UI:
+Threat Modeling Review -> Gate2 Review -> Run Gate2
+
+API:
 POST /api/v1/security-review/gate2/run
-
-Gate2 CI/CD alias:
 POST /api/v1/ci/security-review/gate2/run
+Headers:
+  Content-Type: application/json
+  X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
 
-Task final report:
+curl:
+curl -X POST "http://localhost:18080/api/v1/security-review/gate2/run" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;" \
+  -d '{
+    "project_id":"demo",
+    "product_name":"Demo Security Gate Product",
+    "product_version":"v1.0.0",
+    "task_id":"TASK-000001",
+    "repository":"quy7_roche/AI_Security_Gate",
+    "branch":"main",
+    "documents":["specs/architecture.md","specs/api-design.md","specs/data-model.md","specs/implementation-plan.md"],
+    "gate1_report":"reports/.../Security-Review-Gate1-xxx.md",
+    "threshold":0.78,
+    "triggered_by":"api"
+  }'
+
+CLI:
+python cli/security_gate_cli.py gate2 run \
+  --product-name "Demo Security Gate Product" \
+  --product-version "v1.0.0" \
+  --task-id TASK-000001 \
+  --docs specs/architecture.md specs/api-design.md specs/data-model.md specs/implementation-plan.md</pre></div>
+      </div>
+      <div class="card" style="margin-top:16px"><h3>审批 / 报告 / 知识库</h3><pre>Gate1/Gate2 Approve:
+POST /api/v1/security-review/gate1/{review_id}/approve
+POST /api/v1/security-review/gate2/{review_id}/approve
+POST /api/v1/reports/{review_id}/approve
+
+Report:
+GET /api/v1/reports/{review_id}
+GET /api/v1/reports/{review_id}/download
+PUT /api/v1/reports/{review_id}
+
+Task / Final Report:
+GET /api/v1/tasks
+GET /api/v1/tasks/{task_id}
 GET /api/v1/tasks/{task_id}/final-report
 GET /api/v1/tasks/{task_id}/final-report/download
 
-CLI Gate2 direct:
-python cli/security_gate_cli.py gate2 run --product-name "Demo" --product-version "v1" --task-id TASK-000001 --docs specs/architecture.md specs/api-design.md
+Knowledge Base:
+GET /api/v1/knowledge-base/{gate}
+PUT /api/v1/knowledge-base/{gate}
+GET /api/v1/knowledge-base/{gate}/history
 
-CLI approve Gate1 and auto-run Gate2 if risk exists:
-python cli/security_gate_cli.py approve --review-id gate1-review-xxx --reviewer security.reviewer@example.com</pre></div>
+认证 Header 可选写法:
+X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
+Authorization: Bearer &lt;AI_SECURITY_GATE_API_KEY&gt;</pre></div>
     </section>
   </main>
 </div>
@@ -173,8 +262,9 @@ const byId=id=>document.getElementById(id);
 const lines=id=>byId(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
 const show=(id,data)=>byId(id).textContent=typeof data==='string'?data:JSON.stringify(data,null,2);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-async function fetchJson(url,opts){const r=await fetch(url,opts);const d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d;}
-function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();}
+function apiHeaders(extra={}){const key=localStorage.getItem('aiSecurityGateApiKey')||'';return key?{...extra,'X-API-Key':key}:extra;}
+async function fetchJson(url,opts={}){const headers=apiHeaders(opts.headers||{});const r=await fetch(url,{...opts,headers});const d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d;}
+function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();if(id==='apiHelp')loadUiApiKey();}
 async function health(){try{show('healthOut',await fetchJson('/api/v1/health'));}catch(e){show('healthOut',e.message)}}
 async function refreshAll(){await loadCatalog();await loadStats();await loadTasks();}
 async function loadStats(){const s=await fetchJson('/api/v1/dashboard/stats');byId('mTask').textContent=s.task_count||0;byId('mActivity').textContent=s.activity_count||0;byId('mReport').textContent=s.report_count||0;byId('mApproved').textContent=s.approved_count||0;byId('latestTasksBody').innerHTML=(s.latest_tasks||[]).map(taskRowCompact).join('')||'<tr><td colspan="5" class="muted">No tasks</td></tr>';}
@@ -184,7 +274,7 @@ function versions(product){return [...new Set(state.tasks.filter(t=>!product||t.
 function fillSelect(id,items,selected,label=x=>x,value=x=>x){const el=byId(id);el.innerHTML='';items.forEach(it=>{const o=document.createElement('option');o.value=value(it);o.textContent=label(it);el.appendChild(o);});if(selected&&[...el.options].some(o=>o.value===selected))el.value=selected;}
 function fillFilters(){fillSelect('filterProduct',[''].concat(products()),'',x=>x||'All Products');fillSelect('filterVersion',[''].concat(versions('')),'',x=>x||'All Versions');fillSelect('filterTask',[{task_id:'',task_code:'All Tasks'}].concat(state.tasks),'',t=>t.task_id?`${t.task_code||''} ${t.task_name||t.task_id}`:'All Tasks',t=>t.task_id);}
 function fillReportTaskSelect(){fillSelect('reportTask',state.tasks,state.selectedTask,t=>`${t.task_code||''} ${t.product_name||''} ${t.product_version||''}`,t=>t.task_id);onReportTaskChange();}
-function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td><td>${esc(t.updated_at||'')}</td></tr>`;}
+function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${esc(t.updated_at||'')}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td></tr>`;}
 function reportLinks(t,gate){const url=t[`latest_${gate}_report_url`], dl=t[`latest_${gate}_download_url`];return url?`<span class="badge ${gate==='gate1'?'ok':'warn'}">${gate}</span> <a target="_blank" href="${esc(url)}">View</a>/<a target="_blank" href="${esc(dl)}">Download</a><br>`:`<span class="badge">${gate}: -</span><br>`;}
 async function loadTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(t=>t.product_name===p);if(v)rows=rows.filter(t=>t.product_version===v);if(tid)rows=rows.filter(t=>t.task_id===tid);byId('tasksBody').innerHTML=rows.map(taskRowFull).join('')||'<tr><td colspan="10" class="muted">No tasks</td></tr>';show('taskOut',{count:rows.length});}
 function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
@@ -200,13 +290,17 @@ function onReviewSelect(){state.selectedReview=byId('reportReview').value;}
 function currentReview(){return byId('reportReview').value||state.selectedReview;}
 function openReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');window.open(`/api/v1/reports/${encodeURIComponent(id)}`,'_blank');}
 function downloadReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');window.open(`/api/v1/reports/${encodeURIComponent(id)}/download`,'_blank');}
-async function loadReportForEdit(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const r=await fetch(`/api/v1/reports/${encodeURIComponent(id)}`);byId('reportContent').value=await r.text();show('reportOut',r.ok?'Loaded.':'Failed.');}
+async function loadReportForEdit(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const r=await fetch(`/api/v1/reports/${encodeURIComponent(id)}`,{headers:apiHeaders()});byId('reportContent').value=await r.text();show('reportOut',r.ok?'Loaded.':'Failed.');}
 async function saveReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const d=await fetchJson(`/api/v1/reports/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:byId('reportContent').value,reviewer:byId('reviewer').value,comment:'Manual update from UI'})});show('reportOut',d);await refreshAll();}
 async function approveSelectedReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');await approveReview(id);}
 async function loadKb(){const gate=byId('kbGate').value;const d=await fetchJson(`/api/v1/knowledge-base/${gate}`);byId('kbContent').value=JSON.stringify(d,null,2);show('kbOut','Loaded.');}
 async function loadKbHistory(){const gate=byId('kbGate').value;show('kbOut',await fetchJson(`/api/v1/knowledge-base/${gate}/history`));}
 async function saveKb(){let content;try{content=JSON.parse(byId('kbContent').value);}catch(e){return show('kbOut','Invalid JSON: '+e.message)}const gate=byId('kbGate').value;show('kbOut',await fetchJson(`/api/v1/knowledge-base/${gate}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:byId('kbVersion').value,updated_by:byId('kbUpdatedBy').value,change_reason:byId('kbReason').value,content})}));}
-refreshAll().catch(e=>show('healthOut','Init failed: '+e.message));
+function loadUiApiKey(){const key=localStorage.getItem('aiSecurityGateApiKey')||'';byId('uiApiKey').value=key;show('apiKeyOut',key?'API Key 已保存在当前浏览器。':'未保存');}
+function saveUiApiKey(){localStorage.setItem('aiSecurityGateApiKey',byId('uiApiKey').value.trim());loadUiApiKey();}
+function clearUiApiKey(){localStorage.removeItem('aiSecurityGateApiKey');loadUiApiKey();}
+loadUiApiKey();
+refreshAll().catch(e=>show('healthOut','Init failed: '+e.message+'。如果已启用 AI_SECURITY_GATE_API_KEY，请在“全局配置”中保存 API Key 后点击 Refresh。'));
 </script>
 </body>
 </html>

@@ -260,8 +260,38 @@ Authorization: Bearer &lt;AI_SECURITY_GATE_API_KEY&gt;</pre></div>
 const state={catalog:null,tasks:[],selectedTask:'',selectedReview:''};
 const byId=id=>document.getElementById(id);
 const lines=id=>byId(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
-const show=(id,data)=>byId(id).textContent=typeof data==='string'?data:JSON.stringify(data,null,2);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const HUMAN_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+function isTimestampKey(key){return /(^|_)(created|updated|approved|completed|triggered|reviewed|generated|started|ended)_?at$|(^|_)(time|timestamp)$/i.test(String(key||''));}
+function parseTimestamp(value){
+  if(value===null||value===undefined||value==='')return null;
+  if(value instanceof Date)return Number.isNaN(value.getTime())?null:value;
+  if(typeof value==='number'){
+    const d=new Date(value>100000000000?value:value*1000);
+    return Number.isNaN(d.getTime())?null:d;
+  }
+  if(typeof value!=='string')return null;
+  const text=value.trim();
+  if(!text)return null;
+  if(/^\d{14}$/.test(text)){
+    const d=new Date(`${text.slice(0,4)}-${text.slice(4,6)}-${text.slice(6,8)}T${text.slice(8,10)}:${text.slice(10,12)}:${text.slice(12,14)}`);
+    return Number.isNaN(d.getTime())?null:d;
+  }
+  if(/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/.test(text)){
+    const normalized=/Z$|[+-]\d{2}:?\d{2}$/.test(text)?text:text.replace(' ','T');
+    const d=new Date(normalized);
+    return Number.isNaN(d.getTime())?null:d;
+  }
+  return null;
+}
+function formatDateTime(value){const d=parseTimestamp(value);return d?HUMAN_TIME_FORMATTER.format(d).replace(/\//g,'-'):String(value??'');}
+function formatForDisplay(value,key=''){
+  if(Array.isArray(value))return value.map(item=>formatForDisplay(item));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,formatForDisplay(v,k)]));
+  if(isTimestampKey(key)){const d=parseTimestamp(value);if(d)return formatDateTime(d);}
+  return value;
+}
+const show=(id,data)=>byId(id).textContent=typeof data==='string'?data:JSON.stringify(formatForDisplay(data),null,2);
 function apiHeaders(extra={}){const key=localStorage.getItem('aiSecurityGateApiKey')||'';return key?{...extra,'X-API-Key':key}:extra;}
 async function fetchJson(url,opts={}){const headers=apiHeaders(opts.headers||{});const r=await fetch(url,{...opts,headers});const d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d;}
 function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();if(id==='apiHelp')loadUiApiKey();}
@@ -274,12 +304,12 @@ function versions(product){return [...new Set(state.tasks.filter(t=>!product||t.
 function fillSelect(id,items,selected,label=x=>x,value=x=>x){const el=byId(id);el.innerHTML='';items.forEach(it=>{const o=document.createElement('option');o.value=value(it);o.textContent=label(it);el.appendChild(o);});if(selected&&[...el.options].some(o=>o.value===selected))el.value=selected;}
 function fillFilters(){fillSelect('filterProduct',[''].concat(products()),'',x=>x||'All Products');fillSelect('filterVersion',[''].concat(versions('')),'',x=>x||'All Versions');fillSelect('filterTask',[{task_id:'',task_code:'All Tasks'}].concat(state.tasks),'',t=>t.task_id?`${t.task_code||''} ${t.task_name||t.task_id}`:'All Tasks',t=>t.task_id);}
 function fillReportTaskSelect(){fillSelect('reportTask',state.tasks,state.selectedTask,t=>`${t.task_code||''} ${t.product_name||''} ${t.product_version||''}`,t=>t.task_id);onReportTaskChange();}
-function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${esc(t.updated_at||'')}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td></tr>`;}
+function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${esc(formatDateTime(t.updated_at||''))}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td></tr>`;}
 function reportLinks(t,gate){const url=t[`latest_${gate}_report_url`], dl=t[`latest_${gate}_download_url`];return url?`<span class="badge ${gate==='gate1'?'ok':'warn'}">${gate}</span> <a target="_blank" href="${esc(url)}">View</a>/<a target="_blank" href="${esc(dl)}">Download</a><br>`:`<span class="badge">${gate}: -</span><br>`;}
 async function loadTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(t=>t.product_name===p);if(v)rows=rows.filter(t=>t.product_version===v);if(tid)rows=rows.filter(t=>t.task_id===tid);byId('tasksBody').innerHTML=rows.map(taskRowFull).join('')||'<tr><td colspan="10" class="muted">No tasks</td></tr>';show('taskOut',{count:rows.length});}
-function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
+function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(formatDateTime(ag.triggered_at||ag.completed_at||''))}</span><br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
 function finalLinks(t){const view=t.final_report_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report`;const dl=t.final_report_download_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report/download`;return `<a target="_blank" href="${esc(view)}">Final</a><br><a target="_blank" href="${esc(dl)}">Download</a>`;}
-function approvalText(x){return x?`${esc(x.approved_by)}<br><span class="small muted">${esc(x.approved_at)}</span>`:'-';}
+function approvalText(x){return x?`${esc(x.approved_by)}<br><span class="small muted">${esc(formatDateTime(x.approved_at))}</span>`:'-';}
 function clearFilters(){byId('filterProduct').value='';byId('filterVersion').value='';byId('filterTask').value='';loadTasks();}
 function selectTask(id){state.selectedTask=id;fillReportTaskSelect();show('taskOut',{selected_task:id});}
 async function runGate1(){const body={project_id:byId('g1Project').value,product_name:byId('g1Product').value,product_version:byId('g1Version').value,repository:byId('g1Repo').value,branch:byId('g1Branch').value,documents:lines('g1Docs'),gate2_documents:lines('g1Gate2Docs'),threshold:Number(byId('g1Threshold').value),triggered_by:byId('g1TriggeredBy').value,auto_run_gate2_on_gate1_approval:true};const d=await fetchJson('/api/v1/security-review/gate1/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});show('g1Out',d);await refreshAll();}
@@ -293,7 +323,7 @@ function downloadReport(){const id=currentReview();if(!id)return show('reportOut
 async function loadReportForEdit(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const r=await fetch(`/api/v1/reports/${encodeURIComponent(id)}`,{headers:apiHeaders()});byId('reportContent').value=await r.text();show('reportOut',r.ok?'Loaded.':'Failed.');}
 async function saveReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const d=await fetchJson(`/api/v1/reports/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:byId('reportContent').value,reviewer:byId('reviewer').value,comment:'Manual update from UI'})});show('reportOut',d);await refreshAll();}
 async function approveSelectedReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');await approveReview(id);}
-async function loadKb(){const gate=byId('kbGate').value;const d=await fetchJson(`/api/v1/knowledge-base/${gate}`);byId('kbContent').value=JSON.stringify(d,null,2);show('kbOut','Loaded.');}
+async function loadKb(){const gate=byId('kbGate').value;const d=await fetchJson(`/api/v1/knowledge-base/${gate}`);byId('kbContent').value=JSON.stringify(formatForDisplay(d),null,2);show('kbOut','Loaded.');}
 async function loadKbHistory(){const gate=byId('kbGate').value;show('kbOut',await fetchJson(`/api/v1/knowledge-base/${gate}/history`));}
 async function saveKb(){let content;try{content=JSON.parse(byId('kbContent').value);}catch(e){return show('kbOut','Invalid JSON: '+e.message)}const gate=byId('kbGate').value;show('kbOut',await fetchJson(`/api/v1/knowledge-base/${gate}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:byId('kbVersion').value,updated_by:byId('kbUpdatedBy').value,change_reason:byId('kbReason').value,content})}));}
 function loadUiApiKey(){const key=localStorage.getItem('aiSecurityGateApiKey')||'';byId('uiApiKey').value=key;show('apiKeyOut',key?'API Key 已保存在当前浏览器。':'未保存');}

@@ -7,10 +7,15 @@ from .services.knowledge_base import KnowledgeBaseService
 from .services.review import ReviewService
 
 
-def require_api_key(
+def require_external_api_key(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     authorization: str | None = Header(default=None),
 ):
+    """Require the shared key only for external API and CI/CD task submission.
+
+    Local CLI agents do not call HTTP endpoints. UI task submission uses
+    /api/v1/ui/... routes and intentionally does not require this key.
+    """
     expected = config.AI_SECURITY_GATE_API_KEY
     if not expected:
         return
@@ -22,7 +27,7 @@ def require_api_key(
     raise HTTPException(status_code=401, detail="invalid or missing API key")
 
 
-router = APIRouter(dependencies=[Depends(require_api_key)])
+router = APIRouter()
 review_service = ReviewService()
 kb_service = KnowledgeBaseService()
 
@@ -99,19 +104,31 @@ def catalog():
     return review_service.catalog()
 
 
-@router.post("/security-review/gate1/run")
+@router.post("/security-review/gate1/run", dependencies=[Depends(require_external_api_key)])
 def run_gate1(request: ReviewRunRequest):
     return review_service.run("gate1", request)
 
 
-@router.post("/security-review/gate2/run")
+@router.post("/security-review/gate2/run", dependencies=[Depends(require_external_api_key)])
 def run_gate2(request: ReviewRunRequest):
     return review_service.run("gate2", request)
 
 
-@router.post("/ci/security-review/gate2/run")
+@router.post("/ci/security-review/gate2/run", dependencies=[Depends(require_external_api_key)])
 def run_gate2_from_ci(request: ReviewRunRequest):
     request.triggered_by = request.triggered_by or "ci-cd"
+    return review_service.run("gate2", request)
+
+
+@router.post("/ui/security-review/gate1/run")
+def run_gate1_from_ui(request: ReviewRunRequest):
+    request.triggered_by = request.triggered_by or "ui"
+    return review_service.run("gate1", request)
+
+
+@router.post("/ui/security-review/gate2/run")
+def run_gate2_from_ui(request: ReviewRunRequest):
+    request.triggered_by = request.triggered_by or "ui"
     return review_service.run("gate2", request)
 
 

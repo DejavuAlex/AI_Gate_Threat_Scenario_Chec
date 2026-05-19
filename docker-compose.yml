@@ -2,9 +2,10 @@ services:
   ai-security-gate:
     build: .
     ports:
-      # Host port defaults to 18080 to avoid collisions with common 8000 services.
-      # Override by setting AI_SECURITY_GATE_HOST_PORT in .env or shell.
+      # Main UI/API port. Override by setting AI_SECURITY_GATE_HOST_PORT.
       - "${AI_SECURITY_GATE_HOST_PORT:-18080}:8000"
+      # API documentation service: http://localhost:18081/docs by default.
+      - "${AI_SECURITY_GATE_DOCS_PORT:-18081}:8000"
     volumes:
       - ./reports:/app/reports
       - ./data:/app/data
@@ -12,6 +13,7 @@ services:
       - ./specs:/app/specs
     environment:
       PYTHONUNBUFFERED: "1"
+      AI_SECURITY_GATE_API_KEY: "${AI_SECURITY_GATE_API_KEY:-}"
       AI_LLM_ENABLED: "${AI_LLM_ENABLED:-false}"
       AI_PROVIDER: "${AI_PROVIDER:-openai}"
       OPENAI_MODEL: "${OPENAI_MODEL:-gpt-5-2025-08-07}"

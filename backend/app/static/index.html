@@ -142,82 +142,36 @@ specs/implementation-plan.md</textarea>
 
     <section id="apiHelp" class="tab">
       <div class="grid">
-        <div class="card"><h3>Gate1 调用方式</h3><pre>UI 调用:
-Threat Modeling Review -> Gate1 Review -> Run Gate1
-UI 使用内部接口，不需要 API Key:
+        <div class="card"><h3>Gate1</h3><pre>UI
 POST /api/v1/ui/security-review/gate1/run
 
-API 调用:
+API
 POST /api/v1/security-review/gate1/run
-说明: 外部 API 触发任务需要 AI_SECURITY_GATE_API_KEY，该 key 保存在服务端本地环境变量中，不在 UI 展示或保存。
-Headers:
-  Content-Type: application/json
-  X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
+X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
 
-curl:
-curl -X POST "http://localhost:18080/api/v1/security-review/gate1/run" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;" \
-  -d '{
-    "project_id":"demo",
-    "product_name":"Demo Security Gate Product",
-    "product_version":"v1.0.0",
-    "repository":"quy7_roche/AI_Security_Gate",
-    "branch":"main",
-    "documents":["specs/product-requirements.md","specs/user-stories.md","specs/business-flow.md"],
-    "gate2_documents":["specs/architecture.md","specs/api-design.md","specs/data-model.md","specs/implementation-plan.md"],
-    "threshold":0.78,
-    "triggered_by":"api",
-    "auto_run_gate2_on_gate1_approval":true
-  }'
+CI/CD
+POST /api/v1/security-review/gate1/run
+X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
 
-CI/CD Pipeline:
-CI/CD 使用同一个 AI_SECURITY_GATE_API_KEY 调用外部 API，根据 pipeline 阶段传入需求文档路径。
-
-CLI 本地 Agent:
-不需要 API Key；不创建 Review Task；不写 reports/data；不需要 approve；只返回本地单次 review 结果。
+CLI
 python cli/security_gate_cli.py gate1 run \
   --docs specs/product-requirements.md specs/user-stories.md specs/business-flow.md</pre></div>
 
-        <div class="card"><h3>Gate2 调用方式</h3><pre>UI 调用:
-Threat Modeling Review -> Gate2 Review -> Run Gate2
-UI 使用内部接口，不需要 API Key:
+        <div class="card"><h3>Gate2</h3><pre>UI
 POST /api/v1/ui/security-review/gate2/run
 
-API 调用:
+API
 POST /api/v1/security-review/gate2/run
-说明: 外部 API 触发任务需要 AI_SECURITY_GATE_API_KEY，该 key 保存在服务端本地环境变量中，不在 UI 展示或保存。
-Headers:
-  Content-Type: application/json
-  X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
+X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
 
-curl:
-curl -X POST "http://localhost:18080/api/v1/security-review/gate2/run" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;" \
-  -d '{
-    "project_id":"demo",
-    "product_name":"Demo Security Gate Product",
-    "product_version":"v1.0.0",
-    "task_id":"TASK-000001",
-    "repository":"quy7_roche/AI_Security_Gate",
-    "branch":"main",
-    "documents":["specs/architecture.md","specs/api-design.md","specs/data-model.md","specs/implementation-plan.md"],
-    "gate1_report":"reports/.../Security-Review-Gate1-xxx.md",
-    "threshold":0.78,
-    "triggered_by":"api"
-  }'
-
-CI/CD Pipeline:
+CI/CD
 POST /api/v1/ci/security-review/gate2/run
-CI/CD 使用同一个 AI_SECURITY_GATE_API_KEY，适合在构建、发布或合规检查流水线中直接触发 Gate2。
+X-API-Key: &lt;AI_SECURITY_GATE_API_KEY&gt;
 
-CLI 本地 Agent:
-不需要 API Key；不创建 Review Task；不写 reports/data；不需要 approve；只返回本地单次 review 结果。
+CLI
 python cli/security_gate_cli.py gate2 run \
   --docs specs/architecture.md specs/api-design.md specs/data-model.md specs/implementation-plan.md
 
-可选本地 Gate1 report:
 python cli/security_gate_cli.py gate2 run \
   --docs specs/architecture.md specs/api-design.md \
   --gate1-report reports/local-gate1.md</pre></div>
@@ -233,34 +187,9 @@ const lines=id=>byId(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const HUMAN_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
 function isTimestampKey(key){return /(^|_)(created|updated|approved|completed|triggered|reviewed|generated|started|ended)_?at$|(^|_)(time|timestamp)$/i.test(String(key||''));}
-function parseTimestamp(value){
-  if(value===null||value===undefined||value==='')return null;
-  if(value instanceof Date)return Number.isNaN(value.getTime())?null:value;
-  if(typeof value==='number'){
-    const d=new Date(value>100000000000?value:value*1000);
-    return Number.isNaN(d.getTime())?null:d;
-  }
-  if(typeof value!=='string')return null;
-  const text=value.trim();
-  if(!text)return null;
-  if(/^\d{14}$/.test(text)){
-    const d=new Date(`${text.slice(0,4)}-${text.slice(4,6)}-${text.slice(6,8)}T${text.slice(8,10)}:${text.slice(10,12)}:${text.slice(12,14)}`);
-    return Number.isNaN(d.getTime())?null:d;
-  }
-  if(/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/.test(text)){
-    const normalized=/Z$|[+-]\d{2}:?\d{2}$/.test(text)?text:text.replace(' ','T');
-    const d=new Date(normalized);
-    return Number.isNaN(d.getTime())?null:d;
-  }
-  return null;
-}
+function parseTimestamp(value){if(value===null||value===undefined||value==='')return null;if(value instanceof Date)return Number.isNaN(value.getTime())?null:value;if(typeof value==='number'){const d=new Date(value>100000000000?value:value*1000);return Number.isNaN(d.getTime())?null:d;}if(typeof value!=='string')return null;const text=value.trim();if(!text)return null;if(/^\d{14}$/.test(text)){const d=new Date(`${text.slice(0,4)}-${text.slice(4,6)}-${text.slice(6,8)}T${text.slice(8,10)}:${text.slice(10,12)}:${text.slice(12,14)}`);return Number.isNaN(d.getTime())?null:d;}if(/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/.test(text)){const normalized=/Z$|[+-]\d{2}:?\d{2}$/.test(text)?text:text.replace(' ','T');const d=new Date(normalized);return Number.isNaN(d.getTime())?null:d;}return null;}
 function formatDateTime(value){const d=parseTimestamp(value);return d?HUMAN_TIME_FORMATTER.format(d).replace(/\//g,'-'):String(value??'');}
-function formatForDisplay(value,key=''){
-  if(Array.isArray(value))return value.map(item=>formatForDisplay(item));
-  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,formatForDisplay(v,k)]));
-  if(isTimestampKey(key)){const d=parseTimestamp(value);if(d)return formatDateTime(d);}
-  return value;
-}
+function formatForDisplay(value,key=''){if(Array.isArray(value))return value.map(item=>formatForDisplay(item));if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,formatForDisplay(v,k)]));if(isTimestampKey(key)){const d=parseTimestamp(value);if(d)return formatDateTime(d);}return value;}
 const show=(id,data)=>byId(id).textContent=typeof data==='string'?data:JSON.stringify(formatForDisplay(data),null,2);
 async function fetchJson(url,opts={}){const r=await fetch(url,opts);const d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d;}
 function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();}

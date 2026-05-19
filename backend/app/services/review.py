@@ -39,6 +39,18 @@ def _compact_timestamp(dt: datetime) -> str:
     return dt.strftime("%Y%m%d%H%M%S")
 
 
+def _matched_scenario_summary(match_result: dict) -> list[dict]:
+    return [
+        {
+            "scenario_id": item["scenario"].get("id"),
+            "scenario_name": item["scenario"].get("name"),
+            "final_score": item.get("final_score"),
+            "risk_level": item["scenario"].get("risk", {}).get("level"),
+        }
+        for item in match_result.get("matched_scenarios", [])
+    ]
+
+
 class ReviewService:
     def __init__(self):
         self.kb_service = KnowledgeBaseService()
@@ -239,6 +251,62 @@ class ReviewService:
         match_result["story_assessments"] = matcher.assess_stories(stories, gate)
         return kb, docs, document_text, match_result
 
+    def run_local_agent(self, gate: str, request: ReviewRunRequest) -> dict:
+        """Run Gate1/Gate2 as a local CLI agent without persistence or approval flow.
+
+        This is intended for VS Code, local CLI, and developer workstation usage.
+        It never creates tasks, review records, work orders, report files, approvals,
+        or auto-Gate2 workflow state. The caller receives a single in-memory review
+        result and can decide whether/how to store it locally.
+        """
+        gate = gate.lower()
+        now = datetime.now(timezone.utc)
+        timestamp = _compact_timestamp(now)
+        local_run_id = f"local-{gate}-{timestamp}-{uuid4().hex[:8]}"
+        request.triggered_by = request.triggered_by or "cli-local"
+        request.auto_run_gate2_on_gate1_approval = False
+
+        kb, docs, document_text, match_result = self._run_match(gate, request)
+        verification = {"implemented": 0, "not_implemented": 0, "items": []}
+
+        if gate == "gate2":
+            gate1_report_text = ""
+            if request.gate1_report:
+                gate1_path = Path(request.gate1_report)
+                if not gate1_path.is_absolute():
+                    gate1_path = REPO_ROOT / request.gate1_report
+                if gate1_path.exists():
+                    gate1_report_text = gate1_path.read_text(encoding="utf-8")
+            verification = verify_gate1_controls(document_text, match_result, gate1_report_text)
+            report_markdown = generate_gate2_report(local_run_id, local_run_id, request, kb, match_result, verification, {})
+        else:
+            report_markdown = generate_gate1_report(local_run_id, local_run_id, request, kb, match_result, {})
+
+        return {
+            "execution_mode": "local_cli_agent",
+            "persistence": "none",
+            "approval_required": False,
+            "auto_gate2_enabled": False,
+            "local_run_id": local_run_id,
+            "gate": gate,
+            "status": "completed",
+            "project_id": request.project_id,
+            "product_name": request.product_name,
+            "product_version": request.product_version,
+            "repository": request.repository,
+            "branch": request.branch,
+            "matched": match_result["matched"],
+            "matched_scenarios": _matched_scenario_summary(match_result),
+            "gate1_control_verification": verification,
+            "llm_enabled": match_result.get("llm_enabled", False),
+            "llm_error": match_result.get("llm_error"),
+            "created_at": now.isoformat(),
+            "request": request.model_dump(),
+            "documents": docs,
+            "match_result": match_result,
+            "report_markdown": report_markdown,
+        }
+
     def run(self, gate: str, request: ReviewRunRequest) -> dict:
         gate = gate.lower()
         now = datetime.now(timezone.utc)
@@ -293,15 +361,7 @@ class ReviewService:
             "gate": gate,
             "status": "completed",
             "matched": match_result["matched"],
-            "matched_scenarios": [
-                {
-                    "scenario_id": item["scenario"].get("id"),
-                    "scenario_name": item["scenario"].get("name"),
-                    "final_score": item.get("final_score"),
-                    "risk_level": item["scenario"].get("risk", {}).get("level"),
-                }
-                for item in match_result.get("matched_scenarios", [])
-            ],
+            "matched_scenarios": _matched_scenario_summary(match_result),
             "report_path": relative_report_path,
             "report_url": f"/api/v1/reports/{review_id}",
             "report_download_url": f"/api/v1/reports/{review_id}/download",
@@ -459,12 +519,12 @@ class ReviewService:
                 products.setdefault(product, set())
                 if version:
                     products[product].add(version)
-        return {"products": [{"product_name": product, "versions": sorted(versions)} for product, versions in sorted(products.items())], "tasks": tasks, "totals": {"products": len(products), "tasks": len(tasks), "activities": len(self.list_work_orders())}}
+        return {"products": [{"product_name": product, "versions": sorted(versions)} for product, versions in sorted(products.items())], "tasks": tasks, "totals": {"products": len(products), "tasks": len(tasks)}}
 
     def dashboard_stats(self) -> dict:
         tasks = self.list_tasks()
         activities = self.list_work_orders()
-        return {"task_count": len(tasks), "activity_count": len(activities), "report_count": len([a for a in activities if a.get("report_path")]), "gate1_runs": len([a for a in activities if a.get("gate") == "gate1"]), "gate2_runs": len([a for a in activities if a.get("gate") == "gate2"]), "approved_count": len([a for a in activities if a.get("approval_status") == "approved"]), "modified_count": len([a for a in activities if a.get("approval_status") == "modified"]), "latest_tasks": tasks[:10], "latest_activities": activities[:10]}
+        return {"task_count": len(tasks), "activity_count": len(activities), "report_count": len([a for a in activities if a.get("report_path")]), "gate1_runs": len([a for a in activities if a.get("gate") == "gate1"]), "gate2_runs": len([a for a in activities if a.get("gate") == "gate2"]), "approved_count": len([a for a in activities if a.get("approval_status") == "approved"]), "latest_tasks": tasks[:20]}
 
     def get(self, review_id: str) -> dict:
         return self._load_review(review_id)

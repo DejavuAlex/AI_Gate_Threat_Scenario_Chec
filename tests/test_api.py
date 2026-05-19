@@ -21,15 +21,16 @@ def test_get_gate1_knowledge_base():
     assert body["llm_editable"] is False
 
 
-def test_api_key_is_required_when_configured(monkeypatch):
+def test_external_task_submission_requires_api_key_when_configured(monkeypatch):
     monkeypatch.setattr(config, "AI_SECURITY_GATE_API_KEY", "test-api-key")
-    response = client.get("/api/v1/health")
+
+    assert client.get("/api/v1/health").status_code == 200
+    assert client.get("/api/v1/knowledge-base/gate1").status_code == 200
+
+    response = client.post("/api/v1/security-review/gate1/run", json={})
     assert response.status_code == 401
 
-    response = client.get("/api/v1/health", headers={"X-API-Key": "test-api-key"})
-    assert response.status_code == 200
-
-    response = client.get("/api/v1/health", headers={"Authorization": "Bearer test-api-key"})
-    assert response.status_code == 200
+    response = client.post("/api/v1/security-review/gate1/run", json={}, headers={"X-API-Key": "wrong"})
+    assert response.status_code == 401
 
     monkeypatch.setattr(config, "AI_SECURITY_GATE_API_KEY", "")

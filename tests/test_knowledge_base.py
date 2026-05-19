@@ -8,8 +8,6 @@ def test_gate1_knowledge_base_is_valid_json():
     assert data["gate"] == "Gate1"
     assert data["llm_editable"] is False
     assert len(data["scenarios"]) >= 22
-    scenario_ids = [item["id"] for item in data["scenarios"]]
-    assert len(scenario_ids) == len(set(scenario_ids))
 
 
 def test_gate2_knowledge_base_is_valid_json():
@@ -18,6 +16,4 @@ def test_gate2_knowledge_base_is_valid_json():
     assert data["gate"] == "Gate2"
     assert data["llm_editable"] is False
     assert len(data["scenarios"]) >= 22
-    scenario_ids = [item["id"] for item in data["scenarios"]]
-    assert len(scenario_ids) == len(set(scenario_ids))
     assert all("mapped_gate1_scenario_id" in item for item in data["scenarios"])

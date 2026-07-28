@@ -133,6 +133,10 @@ def _metadata_lines(review_id: str, work_order_id: str, request: Any, gate: str,
         f"- Branch: {request.branch or ''}",
         f"- Triggered By: {request.triggered_by}",
         f"- {kb_label}: {kb.get('knowledge_base_version')}",
+        f"- Knowledge Base ID: {(kb.get('metadata') or {}).get('knowledge_base_id', 'default')}",
+        f"- Knowledge Base Name: {kb.get('name') or (kb.get('metadata') or {}).get('name', '')}",
+        f"- Knowledge Base Category: {kb.get('category') or (kb.get('metadata') or {}).get('category', '')}",
+        f"- Knowledge Base Risk Level: {kb.get('risk_level') or (kb.get('metadata') or {}).get('risk_level', '')}",
         f"- Match Threshold: {request.threshold}",
         "- Approval Status: Pending",
         "",
@@ -173,11 +177,20 @@ def _final_controls(match_result: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(controls))
 
 
+def _request_input_documents(request: Any) -> list[str]:
+    items = list(getattr(request, "documents", []) or [])
+    for index, item in enumerate(getattr(request, "document_texts", []) or [], start=1):
+        name = getattr(item, "name", None) if not isinstance(item, dict) else item.get("name")
+        text = str(name or f"Pasted Spec {index}").strip() or f"Pasted Spec {index}"
+        items.append(f"inline://{text}")
+    return items or ["No input documents provided."]
+
+
 def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], task_meta: dict[str, Any] | None = None) -> str:
     lines = ["# Security Review Gate1 Report", ""]
     lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate1", "Business Requirement Security Review", "Knowledge Base Version", kb, task_meta))
     lines.extend(["## 2. Input Documents", ""])
-    lines.extend([f"- {doc}" for doc in request.documents])
+    lines.extend([f"- {doc}" for doc in _request_input_documents(request)])
     lines.extend(_story_assessments_markdown(match_result))
     lines.extend(["", "## 4. Overall Matching Result", ""])
     if not match_result.get("matched"):
@@ -202,7 +215,7 @@ def generate_gate2_report(review_id: str, work_order_id: str, request: Any, kb: 
     lines.extend(_metadata_lines(review_id, work_order_id, request, "Gate2", "Architecture and Technical Requirement Security Review", "Gate2 Knowledge Base Version", kb, task_meta))
     lines.extend([f"- Gate1 Report: {request.gate1_report or 'Auto latest report for the same task'}", ""])
     lines.extend(["## 2. Input Documents", ""])
-    lines.extend([f"- {doc}" for doc in request.documents])
+    lines.extend([f"- {doc}" for doc in _request_input_documents(request)])
     lines.extend(_story_assessments_markdown(match_result))
     lines.extend(["", "## 4. Overall Gate2 Knowledge Base Matching Result", ""])
     if not match_result.get("matched"):

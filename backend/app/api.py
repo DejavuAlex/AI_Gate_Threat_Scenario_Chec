@@ -1,7 +1,8 @@
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from . import config
@@ -36,6 +37,7 @@ kb_service = KnowledgeBaseService()
 
 ALLOWED_SPEC_EXTENSIONS = {".md", ".markdown", ".txt", ".json", ".yaml", ".yml"}
 MAX_SPEC_FILE_SIZE = 10 * 1024 * 1024
+MAX_KB_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _safe_spec_filename(filename: str | None) -> str:
@@ -318,18 +320,81 @@ def approve_gate2_report(review_id: str, request: ApproveRequest):
     return approve_report(review_id, request)
 
 
-@router.get("/knowledge-base/{gate}")
-def get_knowledge_base(gate: str):
+@router.get("/knowledge-base/{gate}/catalog")
+def get_knowledge_base_catalog(gate: str):
     try:
-        return kb_service.load(gate)
+        return {"items": kb_service.list_catalog(gate)}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/knowledge-base/{gate}/upload")
+async def upload_knowledge_base(
+    gate: str,
+    file: UploadFile = File(...),
+    knowledge_base_id: str = Form(...),
+    updated_by: str = Form("security.admin@example.com"),
+    change_reason: str = Form("Uploaded from UI"),
+    version: str | None = Form(default=None),
+    name: str | None = Form(default=None),
+    category: str | None = Form(default=None),
+    risk_level: str | None = Form(default=None),
+    description: str | None = Form(default=None),
+):
+    total = 0
+    chunks = []
+    try:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_KB_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="knowledge base file is too large")
+            chunks.append(chunk)
+        try:
+            content = json.loads(b"".join(chunks).decode("utf-8"))
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail="knowledge base file must be UTF-8 JSON") from exc
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"invalid knowledge base JSON: {exc.msg}") from exc
+        if not isinstance(content, dict):
+            raise HTTPException(status_code=400, detail="knowledge base JSON must be an object")
+        saved = kb_service.save_uploaded_update(
+            gate,
+            content,
+            knowledge_base_id,
+            updated_by,
+            change_reason,
+            version=version,
+            name=name,
+            category=category,
+            risk_level=risk_level,
+            description=description,
+        )
+        catalog = kb_service.list_catalog(gate)
+        item = next((entry for entry in catalog if entry.get("knowledge_base_id") == saved.get("metadata", {}).get("knowledge_base_id")), None)
+        return {"item": item, "content": saved}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        await file.close()
+
+
+@router.get("/knowledge-base/{gate}")
+def get_knowledge_base(gate: str, knowledge_base_id: str = Query(default="default")):
+    try:
+        return kb_service.load(gate, knowledge_base_id)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/knowledge-base/{gate}/history")
-def get_knowledge_base_history(gate: str):
+def get_knowledge_base_history(gate: str, knowledge_base_id: str | None = Query(default=None)):
     try:
-        return {"items": kb_service.list_history(gate)}
+        return {"items": kb_service.list_history(gate, knowledge_base_id)}
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -337,6 +402,6 @@ def get_knowledge_base_history(gate: str):
 @router.put("/knowledge-base/{gate}")
 def update_knowledge_base(gate: str, request: KnowledgeBaseUpdateRequest):
     try:
-        return kb_service.save_manual_update(gate, request.content, request.updated_by, request.change_reason, request.version)
+        return kb_service.save_manual_update(gate, request.content, request.updated_by, request.change_reason, request.version, request.knowledge_base_id)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))

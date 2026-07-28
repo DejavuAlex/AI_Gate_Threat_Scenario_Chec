@@ -2,6 +2,11 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class InlineDocument(BaseModel):
+    name: str = "Pasted Spec"
+    content: str
+
+
 class ReviewRunRequest(BaseModel):
     project_id: str = "demo"
     product_name: str = "Demo Security Gate Product"
@@ -11,7 +16,11 @@ class ReviewRunRequest(BaseModel):
     repository: str | None = None
     branch: str | None = None
     documents: list[str] = Field(default_factory=list)
+    document_texts: list[InlineDocument] = Field(default_factory=list)
     gate2_documents: list[str] = Field(default_factory=list)
+    gate2_document_texts: list[InlineDocument] = Field(default_factory=list)
+    knowledge_base_id: str = "default"
+    gate2_knowledge_base_id: str = "default"
     knowledge_base_version: str = "latest"
     threshold: float = 0.78
     triggered_by: str = "manual"
@@ -31,6 +40,7 @@ class ReportUpdateRequest(BaseModel):
 
 
 class KnowledgeBaseUpdateRequest(BaseModel):
+    knowledge_base_id: str = "default"
     version: str
     updated_by: str
     change_reason: str

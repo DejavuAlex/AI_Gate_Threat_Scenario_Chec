@@ -119,6 +119,8 @@ class ReviewService:
             "approval": {},
             "auto_gate2": {"enabled": request.auto_run_gate2_on_gate1_approval, "status": "not_started"},
             "gate2_documents": request.gate2_documents or DEFAULT_GATE2_DOCUMENTS,
+            "gate2_document_texts": [item.model_dump() for item in request.gate2_document_texts],
+            "gate2_knowledge_base_id": request.gate2_knowledge_base_id,
         }
         path = self._task_path_by_meta(request.product_name, request.product_version, task_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -242,8 +244,8 @@ class ReviewService:
         return report_path if report_path.exists() else None
 
     def _run_match(self, gate: str, request: ReviewRunRequest) -> tuple[dict, list[dict], str, dict]:
-        kb = self.kb_service.load(gate)
-        document_text, docs = read_documents(request.documents)
+        kb = self.kb_service.load(gate, request.knowledge_base_id)
+        document_text, docs = read_documents(request.documents, request.document_texts)
         stories = extract_stories(docs)
         matcher = MatchingEngine(kb, request.threshold)
         match_result = matcher.match(document_text, gate)
@@ -300,6 +302,8 @@ class ReviewService:
             "gate1_control_verification": verification,
             "llm_enabled": match_result.get("llm_enabled", False),
             "llm_error": match_result.get("llm_error"),
+            "knowledge_base_id": request.knowledge_base_id,
+            "knowledge_base_version": kb.get("knowledge_base_version"),
             "created_at": now.isoformat(),
             "request": request.model_dump(),
             "documents": docs,
@@ -372,6 +376,8 @@ class ReviewService:
             "approved_at": None,
             "llm_enabled": match_result.get("llm_enabled", False),
             "llm_error": match_result.get("llm_error"),
+            "knowledge_base_id": request.knowledge_base_id,
+            "knowledge_base_version": kb.get("knowledge_base_version"),
             "gate1_control_verification": verification,
             "created_at": now.isoformat(),
             "request": request.model_dump(),
@@ -419,6 +425,8 @@ class ReviewService:
                         repository=review.get("request", {}).get("repository"),
                         branch=review.get("request", {}).get("branch"),
                         documents=review.get("request", {}).get("gate2_documents") or task.get("gate2_documents") or DEFAULT_GATE2_DOCUMENTS,
+                        document_texts=review.get("request", {}).get("gate2_document_texts") or task.get("gate2_document_texts") or [],
+                        knowledge_base_id=review.get("request", {}).get("gate2_knowledge_base_id") or task.get("gate2_knowledge_base_id") or "default",
                         threshold=review.get("request", {}).get("threshold", 0.78),
                         triggered_by="auto-after-gate1-approval",
                         gate1_report=review.get("report_path"),

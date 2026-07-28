@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from backend.app.schemas import ApproveRequest, ReviewRunRequest
-from backend.app.services.documents import extract_stories
+from backend.app.schemas import ApproveRequest, InlineDocument, ReviewRunRequest
+from backend.app.services.documents import extract_stories, read_documents
 from backend.app.services.matching import MatchingEngine
 from backend.app.services.report_generator import generate_gate1_report
 
@@ -13,14 +13,29 @@ def test_review_run_request_supports_task_workflow_fields():
         task_id="TASK-000001",
         task_name="Demo-v1-gate1",
         documents=["specs/product-requirements.md"],
+        document_texts=[InlineDocument(name="Pasted Gate1", content="Inline business spec")],
         gate2_documents=["specs/architecture.md"],
+        gate2_document_texts=[InlineDocument(name="Pasted Gate2", content="Inline architecture spec")],
+        knowledge_base_id="cloud-service",
+        gate2_knowledge_base_id="cloud-service-tech",
         auto_run_gate2_on_gate1_approval=True,
     )
 
     assert request.task_id == "TASK-000001"
     assert request.task_name == "Demo-v1-gate1"
+    assert request.document_texts[0].content == "Inline business spec"
     assert request.gate2_documents == ["specs/architecture.md"]
+    assert request.gate2_document_texts[0].name == "Pasted Gate2"
+    assert request.knowledge_base_id == "cloud-service"
+    assert request.gate2_knowledge_base_id == "cloud-service-tech"
     assert request.auto_run_gate2_on_gate1_approval is True
+
+
+def test_read_documents_includes_pasted_inline_specs():
+    document_text, docs = read_documents([], [InlineDocument(name="Cloud Service Spec", content="# US-001 Upload\nUsers upload files.")])
+
+    assert "inline://Cloud Service Spec" in document_text
+    assert docs == [{"path": "inline://Cloud Service Spec", "content": "# US-001 Upload\nUsers upload files."}]
 
 
 def test_approve_request_comment_is_optional():
@@ -93,6 +108,7 @@ def test_gate1_report_includes_task_metadata_and_story_assessment():
         repository="quy7_roche/AI_Security_Gate",
         branch="main",
         documents=["specs/user-stories.md"],
+        document_texts=[InlineDocument(name="Pasted Story", content="Users export customer data.")],
         threshold=0.78,
         triggered_by="pytest",
     )
@@ -133,6 +149,7 @@ def test_gate1_report_adds_threat_modeling_sections_without_replacing_original_c
         product_name="Demo",
         product_version="v1",
         documents=["specs/user-stories.md"],
+        document_texts=[InlineDocument(name="Pasted Story", content="Users export customer data.")],
         threshold=0.78,
         triggered_by="pytest",
     )
@@ -158,8 +175,24 @@ def test_gate1_report_adds_threat_modeling_sections_without_replacing_original_c
         "story_assessments": [],
     }
 
-    report = generate_gate1_report("review-1", "work-order-1", request, {"knowledge_base_version": "1.0.0"}, match_result)
+    report = generate_gate1_report(
+        "review-1",
+        "work-order-1",
+        request,
+        {
+            "knowledge_base_version": "1.0.0",
+            "name": "Cloud Service KB",
+            "category": "Cloud Service",
+            "risk_level": "Yellow",
+            "metadata": {"knowledge_base_id": "cloud-service"},
+        },
+        match_result,
+    )
 
+    assert "inline://Pasted Story" in report
+    assert "Knowledge Base ID: cloud-service" in report
+    assert "Knowledge Base Category: Cloud Service" in report
+    assert "Knowledge Base Risk Level: Yellow" in report
     assert "#### Threat Scenario" in report
     assert "#### Initial Risk Estimation" in report
     assert "#### Risk Control" in report

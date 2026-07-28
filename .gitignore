@@ -9,6 +9,7 @@ data/reviews/*.json
 data/task_sequence.json
 data/tasks/
 data/work_orders/
+data/knowledge_base_history/
 reports/Security-Review-Gate1.md
 reports/Security-Review-Gate2.md
 reports/*/

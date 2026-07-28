@@ -82,6 +82,12 @@
     </section>
 
     <section id="newTask" class="tab">
+      <div class="card" style="margin-bottom:16px">
+        <h3>Spec 文件</h3>
+        <div class="row"><input id="specUpload" type="file" multiple accept=".md,.markdown,.txt,.json,.yaml,.yml"><button onclick="uploadSpecs()">上传到 specs</button><button class="secondary" onclick="loadSpecs()">刷新列表</button></div>
+        <div class="tableWrap"><table><thead><tr><th>文件</th><th>路径</th><th>大小</th><th>更新时间</th><th>加入文档</th></tr></thead><tbody id="specsBody"></tbody></table></div>
+        <pre id="specOut">等待上传...</pre>
+      </div>
       <div class="grid">
         <div class="card">
           <h3>Gate1 Review</h3>
@@ -181,7 +187,7 @@ python cli/security_gate_cli.py gate2 run \
 </div>
 
 <script>
-const state={catalog:null,tasks:[],selectedTask:'',selectedReview:''};
+const state={catalog:null,tasks:[],specs:[],selectedTask:'',selectedReview:''};
 const byId=id=>document.getElementById(id);
 const lines=id=>byId(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -194,9 +200,14 @@ const show=(id,data)=>byId(id).textContent=typeof data==='string'?data:JSON.stri
 async function fetchJson(url,opts={}){const r=await fetch(url,opts);const d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d;}
 function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();}
 async function health(){try{show('healthOut',await fetchJson('/api/v1/health'));}catch(e){show('healthOut',e.message)}}
-async function refreshAll(){await loadCatalog();await loadStats();await loadTasks();}
+async function refreshAll(){await loadCatalog();await loadSpecs();await loadStats();await loadTasks();}
 async function loadStats(){const s=await fetchJson('/api/v1/dashboard/stats');byId('mTask').textContent=s.task_count||0;byId('mActivity').textContent=s.activity_count||0;byId('mReport').textContent=s.report_count||0;byId('mApproved').textContent=s.approved_count||0;byId('latestTasksBody').innerHTML=(s.latest_tasks||[]).map(taskRowCompact).join('')||'<tr><td colspan="5" class="muted">No tasks</td></tr>';}
 async function loadCatalog(){state.catalog=await fetchJson('/api/v1/catalog');state.tasks=state.catalog.tasks||[];fillFilters();fillReportTaskSelect();}
+function formatBytes(size){const n=Number(size||0);if(n<1024)return `${n} B`;if(n<1024*1024)return `${(n/1024).toFixed(1)} KB`;return `${(n/1024/1024).toFixed(1)} MB`;}
+function appendSpecPath(targetId,path){const el=byId(targetId),docs=lines(targetId);if(!docs.includes(path)){docs.push(path);el.value=docs.join('\n');}show('specOut',`已加入 ${path}`);}
+function renderSpecs(){const body=byId('specsBody');if(!body)return;body.innerHTML=(state.specs||[]).map(item=>`<tr><td>${esc(item.filename)}</td><td><code>${esc(item.path)}</code></td><td>${esc(formatBytes(item.size))}</td><td>${esc(formatDateTime(item.updated_at||''))}</td><td><button class="secondary inline" onclick="appendSpecPath('g1Docs','${esc(item.path)}')">Gate1</button><button class="secondary inline" onclick="appendSpecPath('g1Gate2Docs','${esc(item.path)}')">Gate1→Gate2</button><button class="secondary inline" onclick="appendSpecPath('g2Docs','${esc(item.path)}')">Gate2</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No spec files</td></tr>';}
+async function loadSpecs(){try{const d=await fetchJson('/api/v1/specs');state.specs=d.items||[];renderSpecs();}catch(e){show('specOut','Spec 列表加载失败: '+e.message);}}
+async function uploadSpecs(){const input=byId('specUpload'),files=[...(input.files||[])];if(!files.length)return show('specOut','请选择要上传的 spec 文件。');const form=new FormData();files.forEach(file=>form.append('files',file));try{const r=await fetch('/api/v1/specs/upload',{method:'POST',body:form}),d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));input.value='';show('specOut',d);await loadSpecs();}catch(e){show('specOut','上传失败: '+e.message);}}
 function products(){return [...new Set(state.tasks.map(t=>t.product_name).filter(Boolean))];}
 function versions(product){return [...new Set(state.tasks.filter(t=>!product||t.product_name===product).map(t=>t.product_version).filter(Boolean))];}
 function fillSelect(id,items,selected,label=x=>x,value=x=>x){const el=byId(id);el.innerHTML='';items.forEach(it=>{const o=document.createElement('option');o.value=value(it);o.textContent=label(it);el.appendChild(o);});if(selected&&[...el.options].some(o=>o.value===selected))el.value=selected;}

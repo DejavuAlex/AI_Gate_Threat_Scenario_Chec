@@ -2,12 +2,85 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+def _risk_table_rows(risk: dict[str, Any]) -> list[str]:
+    return [
+        f"| Risk Level | {risk.get('level', '')} |",
+        f"| P1 | {risk.get('P1', '')} |",
+        f"| P2 | {risk.get('P2', '')} |",
+        f"| P | {risk.get('P', '')} |",
+        f"| Severity | {risk.get('severity', '')} |",
+    ]
+
+
+def _threat_modeling_sections(item: dict[str, Any]) -> list[str]:
+    scenario = item["scenario"]
+    risk = scenario.get("risk", {})
+    controls = item.get("optimized_security_controls") or scenario.get("security_control_requirements", [])
+    residual = scenario.get("residual_risk") or scenario.get("residualRisk") or {}
+    residual_level = residual.get("level") or residual.get("risk_level") or "Control-dependent / Pending validation"
+    residual_basis = residual.get("basis") or (
+        "Expected to be reduced after all listed controls are fully implemented; "
+        "final residual risk requires implementation evidence and reviewer confirmation."
+    )
+    if_controls_missing = risk.get("level", "Initial risk")
+
+    lines = [
+        "#### Threat Scenario",
+        "",
+        f"- Scenario ID: {scenario.get('id', '')}",
+        f"- Scenario Name: {scenario.get('name', '')}",
+        f"- Problem Scenario: {scenario.get('problem_scenario', '')}",
+        f"- Category: {scenario.get('category', '')}",
+        "- Threat / Risk Description:",
+    ]
+    risks = scenario.get("risk_identification", [])
+    if risks:
+        lines.extend([f"  - {risk_text}" for risk_text in risks])
+    else:
+        lines.append("  - No explicit risk description is configured for this scenario.")
+
+    lines.extend([
+        "",
+        "#### Initial Risk Estimation",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+    ])
+    lines.extend(_risk_table_rows(risk))
+
+    lines.extend([
+        "",
+        "#### Risk Control",
+        "",
+    ])
+    if controls:
+        lines.extend([f"- {control}" for control in controls])
+    else:
+        lines.append("- No risk control is configured for this scenario.")
+
+    lines.extend([
+        "",
+        "#### Residual Risk Estimation",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Residual Risk Level | {residual_level} |",
+        f"| Estimation Basis | {residual_basis} |",
+        f"| If Controls Are Missing | Same as initial risk ({if_controls_missing}) |",
+        "",
+    ])
+    return lines
+
+
 def _scenario_markdown(item: dict[str, Any]) -> str:
     scenario = item["scenario"]
     risk = scenario.get("risk", {})
     lines = [
         f"### Scenario: {scenario.get('id')} {scenario.get('name')}",
         "",
+    ]
+    lines.extend(_threat_modeling_sections(item))
+    lines.extend([
         "#### Scenario Content",
         "",
         f"- Problem Scenario: {scenario.get('problem_scenario', '')}",
@@ -20,7 +93,7 @@ def _scenario_markdown(item: dict[str, Any]) -> str:
         "",
         "#### Risk Identification",
         "",
-    ]
+    ])
     lines.extend([f"- {risk_text}" for risk_text in scenario.get("risk_identification", [])])
     lines.extend(["", "#### Matched Evidence", ""])
     if item.get("matched_evidence"):

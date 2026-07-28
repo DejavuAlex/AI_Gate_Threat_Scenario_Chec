@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from . import config
@@ -30,6 +33,49 @@ def require_external_api_key(
 router = APIRouter()
 review_service = ReviewService()
 kb_service = KnowledgeBaseService()
+
+ALLOWED_SPEC_EXTENSIONS = {".md", ".markdown", ".txt", ".json", ".yaml", ".yml"}
+MAX_SPEC_FILE_SIZE = 10 * 1024 * 1024
+
+
+def _safe_spec_filename(filename: str | None) -> str:
+    name = Path((filename or "").replace("\\", "/")).name.strip()
+    name = "".join(ch if (ch.isalnum() or ch in {".", "-", "_", " ", "(", ")"}) else "_" for ch in name).strip()
+    if not name or name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="invalid spec filename")
+    if not Path(name).stem.strip(" ._"):
+        raise HTTPException(status_code=400, detail="invalid spec filename")
+    suffix = Path(name).suffix.lower()
+    if suffix not in ALLOWED_SPEC_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_SPEC_EXTENSIONS))
+        raise HTTPException(status_code=400, detail=f"unsupported spec file type; allowed: {allowed}")
+    return name
+
+
+def _unique_spec_path(filename: str) -> Path:
+    config.SPECS_DIR.mkdir(parents=True, exist_ok=True)
+    path = config.SPECS_DIR / filename
+    if not path.exists():
+        return path
+    original = Path(filename)
+    stem, suffix = original.stem, original.suffix
+    index = 1
+    while True:
+        candidate = config.SPECS_DIR / f"{stem}-{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+        index += 1
+
+
+def _spec_item(path: Path) -> dict:
+    stat = path.stat()
+    rel = path.relative_to(config.SPECS_DIR).as_posix()
+    return {
+        "filename": path.name,
+        "path": f"specs/{rel}",
+        "size": stat.st_size,
+        "updated_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+    }
 
 
 def _task_final_report_markdown(task: dict) -> str:
@@ -102,6 +148,47 @@ def dashboard_stats():
 @router.get("/catalog")
 def catalog():
     return review_service.catalog()
+
+
+@router.get("/specs")
+def list_specs():
+    config.SPECS_DIR.mkdir(parents=True, exist_ok=True)
+    files = [path for path in config.SPECS_DIR.rglob("*") if path.is_file() and not path.name.startswith(".")]
+    return {"items": [_spec_item(path) for path in sorted(files, key=lambda item: item.name.lower())]}
+
+
+@router.post("/specs/upload")
+async def upload_specs(files: list[UploadFile] = File(...)):
+    if not files:
+        raise HTTPException(status_code=400, detail="no spec files uploaded")
+
+    uploaded = []
+    for file in files:
+        filename = _safe_spec_filename(file.filename)
+        path = _unique_spec_path(filename)
+        total = 0
+        try:
+            with path.open("wb") as output:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_SPEC_FILE_SIZE:
+                        raise HTTPException(status_code=413, detail="spec file is too large")
+                    output.write(chunk)
+            try:
+                path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as exc:
+                raise HTTPException(status_code=400, detail="spec file must be UTF-8 text") from exc
+            uploaded.append(_spec_item(path))
+        except Exception:
+            if path.exists():
+                path.unlink(missing_ok=True)
+            raise
+        finally:
+            await file.close()
+    return {"items": uploaded}
 
 
 @router.post("/security-review/gate1/run", dependencies=[Depends(require_external_api_key)])

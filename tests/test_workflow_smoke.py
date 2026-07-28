@@ -125,3 +125,46 @@ def test_gate1_report_includes_task_metadata_and_story_assessment():
     assert "Story-by-Story Threat Scenario Assessment" in report
     assert "US-001" in report
     assert "No risk." in report
+
+
+def test_gate1_report_adds_threat_modeling_sections_without_replacing_original_content():
+    request = ReviewRunRequest(
+        project_id="demo",
+        product_name="Demo",
+        product_version="v1",
+        documents=["specs/user-stories.md"],
+        threshold=0.78,
+        triggered_by="pytest",
+    )
+    scenario = {
+        "id": "S-001",
+        "name": "Sensitive Data Export",
+        "problem_scenario": "Can users export sensitive customer data?",
+        "category": "Data Export",
+        "risk": {"level": "Yellow", "P1": 6, "P2": 6, "P": 3, "severity": 8},
+        "risk_identification": ["PII leakage through bulk export"],
+        "security_control_requirements": ["Require approval before export"],
+    }
+    match_result = {
+        "matched": True,
+        "matched_scenarios": [
+            {
+                "scenario": scenario,
+                "matched_evidence": ["Users export customer data"],
+                "score_breakdown": {"keyword_match": 1.0},
+                "final_score": 0.95,
+            }
+        ],
+        "story_assessments": [],
+    }
+
+    report = generate_gate1_report("review-1", "work-order-1", request, {"knowledge_base_version": "1.0.0"}, match_result)
+
+    assert "#### Threat Scenario" in report
+    assert "#### Initial Risk Estimation" in report
+    assert "#### Risk Control" in report
+    assert "#### Residual Risk Estimation" in report
+    assert "Control-dependent / Pending validation" in report
+    assert "#### Scenario Content" in report
+    assert "#### Required Security Controls" in report
+    assert "Require approval before export" in report

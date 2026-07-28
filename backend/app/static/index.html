@@ -94,15 +94,16 @@
           <div class="two"><div><label>Product Name</label><input id="g1Product" value="Demo Security Gate Product"></div><div><label>Product Version</label><input id="g1Version" value="v1.0.0"></div></div>
           <div class="three"><div><label>Project ID</label><input id="g1Project" value="demo"></div><div><label>Repository</label><input id="g1Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g1Branch" value="main"></div></div>
           <div class="two"><div><label>Gate1 Golden KB</label><select id="g1Kb"></select></div><div><label>Auto Gate2 Golden KB</label><select id="g1Gate2Kb"></select></div></div>
-          <label>Gate1 Requirement Documents</label><textarea id="g1Docs">specs/product-requirements.md
+          <div class="note">输入来源会合并：文档路径 + 粘贴内容会一起参与评审。只想使用粘贴内容时，清空文档路径。</div>
+          <label>Gate1 文档路径（与粘贴内容合并）</label><textarea id="g1Docs">specs/product-requirements.md
 specs/user-stories.md
 specs/business-flow.md</textarea>
-          <label>Gate1 Pasted Spec Content</label><textarea id="g1Text" placeholder="可以直接粘贴业务需求、用户故事或流程说明"></textarea>
-          <label>Gate2 Documents for Auto-run after Gate1 Approve</label><textarea id="g1Gate2Docs">specs/architecture.md
+          <label>Gate1 粘贴内容（与文档路径合并）</label><textarea id="g1Text" placeholder="可以直接粘贴业务需求、用户故事或流程说明"></textarea>
+          <label>自动 Gate2 文档路径（与粘贴内容合并）</label><textarea id="g1Gate2Docs">specs/architecture.md
 specs/api-design.md
 specs/data-model.md
 specs/implementation-plan.md</textarea>
-          <label>Gate2 Pasted Spec Content for Auto-run</label><textarea id="g1Gate2Text" placeholder="Gate1 审批后自动运行 Gate2 时使用，可留空"></textarea>
+          <label>自动 Gate2 粘贴内容（与文档路径合并）</label><textarea id="g1Gate2Text" placeholder="Gate1 审批后自动运行 Gate2 时使用，可留空"></textarea>
           <div class="two"><div><label>Threshold</label><input id="g1Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g1TriggeredBy" value="ui"></div></div>
           <button onclick="runGate1()">Run Gate1</button>
           <pre id="g1Out">等待运行...</pre>
@@ -115,11 +116,12 @@ specs/implementation-plan.md</textarea>
           <label>Existing Task ID / Code</label><input id="g2TaskId" placeholder="例如 task-xxx 或 TASK-000001，可留空">
           <div class="three"><div><label>Project ID</label><input id="g2Project" value="demo"></div><div><label>Repository</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g2Branch" value="main"></div></div>
           <label>Gate2 Golden KB</label><select id="g2Kb"></select>
-          <label>Gate2 Documents</label><textarea id="g2Docs">specs/architecture.md
+          <div class="note">输入来源会合并：文档路径 + 粘贴内容会一起参与评审。只想使用粘贴内容时，清空文档路径。</div>
+          <label>Gate2 文档路径（与粘贴内容合并）</label><textarea id="g2Docs">specs/architecture.md
 specs/api-design.md
 specs/data-model.md
 specs/implementation-plan.md</textarea>
-          <label>Gate2 Pasted Spec Content</label><textarea id="g2Text" placeholder="可以直接粘贴架构设计、API设计、数据模型或实现计划"></textarea>
+          <label>Gate2 粘贴内容（与文档路径合并）</label><textarea id="g2Text" placeholder="可以直接粘贴架构设计、API设计、数据模型或实现计划"></textarea>
           <label>Gate1 Report Path（可留空：同 task 下自动查找最新 Gate1 report）</label><input id="g2Gate1Report" value="">
           <div class="two"><div><label>Threshold</label><input id="g2Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g2TriggeredBy" value="ui-direct-gate2"></div></div>
           <button onclick="runGate2()">Run Gate2</button>

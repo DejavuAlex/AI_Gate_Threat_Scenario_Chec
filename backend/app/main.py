@@ -18,4 +18,7 @@ app.include_router(router, prefix="/api/v1")
 
 @app.get("/", include_in_schema=False)
 def index():
-    return FileResponse(static_dir / "index.html")
+    return FileResponse(
+        static_dir / "index.html",
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )

@@ -41,3 +41,12 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://eu.aigw.galileo.roche.co
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_MATCHING_TEMPERATURE = float(os.getenv("LLM_MATCHING_TEMPERATURE", "0"))
 LLM_MATCHING_TIMEOUT_SECONDS = float(os.getenv("LLM_MATCHING_TIMEOUT_SECONDS", "60"))
+
+# Jira integration. The API token is a secret and must only come from the
+# environment or .env; it is never returned by the API or written to a report.
+JIRA_BASE_URL = os.getenv("JIRA_BASE_URL", "").rstrip("/")
+JIRA_PROJECT_KEY = os.getenv("JIRA_PROJECT_KEY", "")
+JIRA_EMAIL = os.getenv("JIRA_EMAIL", "")
+JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN", "")
+JIRA_ISSUE_TYPE = os.getenv("JIRA_ISSUE_TYPE", "Task")
+JIRA_TIMEOUT_SECONDS = float(os.getenv("JIRA_TIMEOUT_SECONDS", "30"))

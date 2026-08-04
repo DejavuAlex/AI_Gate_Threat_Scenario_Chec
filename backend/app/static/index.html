@@ -65,6 +65,8 @@
     input::placeholder, textarea::placeholder { color:#5d6f88; }
     input:disabled, textarea:disabled, select:disabled { background:#0a101c; color:#6b7c93; cursor:not-allowed; }
     input[type=file] { padding:7px 10px; color:var(--muted); font-size:12.5px; }
+    .row input[type=file] { width:auto; flex:1 1 280px; }
+    .row button { margin-top:0; }
     input[type=file]::file-selector-button { margin:0 10px 0 0; padding:6px 12px; border:1px solid #31425e; border-radius:7px; background:#25334b; color:#d5deec; font:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:background .16s ease; }
     input[type=file]::file-selector-button:hover { background:#2d3d59; }
     textarea { min-height:96px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.6; resize:vertical; }
@@ -118,7 +120,26 @@
     tbody tr:hover { background:rgba(148,163,184,.05); }
     tbody tr:last-child td { border-bottom:0; }
     th { color:#9db0c8; background:#0c1424; position:sticky; top:0; z-index:1; font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; }
-    .tableWrap { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:11px; margin-top:14px; background:var(--surface); }
+    .tableWrap {
+      overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:11px; margin-top:14px;
+      background:
+        linear-gradient(to top, var(--surface), rgba(13,21,38,0)) bottom / 100% 28px no-repeat local,
+        radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,.55), rgba(0,0,0,0)) bottom / 100% 14px no-repeat scroll,
+        var(--surface);
+    }
+    .tableWrap.short { max-height:260px; }
+    details.panel { padding:0; }
+    details.panel > summary {
+      list-style:none; cursor:pointer; padding:16px 18px; display:flex; align-items:center; gap:10px;
+      font-size:15px; font-weight:700; color:#dce6f5; border-radius:var(--radius); transition:background .16s ease;
+    }
+    details.panel > summary::-webkit-details-marker { display:none; }
+    details.panel > summary::after { content:"\25be"; margin-left:auto; color:var(--muted); font-size:13px; transition:transform .2s ease; }
+    details.panel[open] > summary::after { transform:rotate(180deg); }
+    details.panel > summary:hover { background:rgba(148,163,184,.06); }
+    details.panel[open] > summary { border-bottom:1px solid var(--line-soft); border-radius:var(--radius) var(--radius) 0 0; }
+    .panelBody { padding:2px 18px 18px; }
+    pre.out:empty { display:none; }
     .note { border-left:3px solid var(--accent); background:linear-gradient(90deg,var(--accent-soft),rgba(56,189,248,0)); padding:10px 13px; border-radius:9px; margin-bottom:14px; font-size:12.5px; color:#c5d5e8; }
     @media(max-width:900px){.app{grid-template-columns:1fr}.three,.two{grid-template-columns:1fr}main{padding:18px}}
   </style>
@@ -128,19 +149,19 @@
   <aside>
     <div class="brand"><h1>AI Security Gate</h1><p>AI驱动的安全评审威胁建模</p></div>
     <div class="nav">
-      <button class="active" onclick="showTab('dashboard', this)">Dashboard</button>
-      <button onclick="showTab('newTask', this)">Threat Modeling Review</button>
-      <button onclick="showTab('taskList', this)">AI Gate Task List</button>
-      <button onclick="showTab('reports', this)">Report Review</button>
+      <button class="active" onclick="showTab('dashboard', this)">概览</button>
+      <button onclick="showTab('newTask', this)">威胁建模评审</button>
+      <button onclick="showTab('taskList', this)">Gate 工单列表</button>
+      <button onclick="showTab('reports', this)">报告评审与审批</button>
       <button onclick="showTab('kb', this)">金标准知识库</button>
-      <button onclick="showTab('apiHelp', this)">全局配置</button>
+      <button onclick="showTab('apiHelp', this)">接口调用示例</button>
     </div>
   </aside>
 
   <main>
     <div class="topbar">
-      <div><h2 id="pageTitle">Dashboard</h2></div>
-      <div class="row"><button class="secondary" onclick="refreshAll()">Refresh</button><button class="secondary" onclick="health()">Health</button></div>
+      <div><h2 id="pageTitle">概览</h2></div>
+      <div class="row"><span class="badge" id="healthBadge">检查中</span><button class="secondary" onclick="refreshAll()">刷新数据</button></div>
     </div>
 
     <section id="dashboard" class="tab active">
@@ -151,16 +172,18 @@
         <div class="metric"><div class="num" id="mApproved">0</div><div class="label">Approved</div></div>
       </div>
       <div class="card" style="margin-top:16px"><h3>最新 Review Task</h3><div class="tableWrap"><table><thead><tr><th>Code</th><th>Product / Version</th><th>Flow</th><th>Updated</th><th>Reports</th></tr></thead><tbody id="latestTasksBody"></tbody></table></div></div>
-      <pre id="healthOut">等待检查...</pre>
+      <pre id="healthOut" class="out"></pre>
     </section>
 
     <section id="newTask" class="tab">
-      <div class="card" style="margin-bottom:16px">
-        <h3>Spec 文件</h3>
-        <div class="row"><input id="specUpload" type="file" multiple accept=".md,.markdown,.txt,.json,.yaml,.yml"><button onclick="uploadSpecs()">上传到 specs</button><button class="secondary" onclick="loadSpecs()">刷新列表</button></div>
-        <div class="tableWrap"><table><thead><tr><th>文件</th><th>路径</th><th>大小</th><th>更新时间</th><th>加入文档</th></tr></thead><tbody id="specsBody"></tbody></table></div>
-        <pre id="specOut">等待上传...</pre>
-      </div>
+      <details class="card panel" style="margin-bottom:16px">
+        <summary>Spec 文件<span class="badge" id="specCount">0</span><span class="muted small">上传文档，或把已有文档一键加入下方的 Gate 输入</span></summary>
+        <div class="panelBody">
+          <div class="row"><input id="specUpload" type="file" multiple accept=".md,.markdown,.txt,.json,.yaml,.yml"><button onclick="uploadSpecs()">上传</button><button class="secondary" onclick="loadSpecs()">刷新</button></div>
+          <div class="tableWrap short"><table><thead><tr><th>文件</th><th>路径</th><th>大小</th><th>更新时间</th><th>加入文档</th></tr></thead><tbody id="specsBody"></tbody></table></div>
+          <pre id="specOut" class="out"></pre>
+        </div>
+      </details>
       <div class="grid">
         <div class="card">
           <h3>Gate1 Review</h3>
@@ -183,8 +206,8 @@ specs/implementation-plan.md</textarea></div>
             <div class="sourcePanel" data-source-panel="g1Gate2-paste"><label>自动 Gate2 粘贴内容</label><textarea id="g1Gate2Text" placeholder="Gate1 审批后自动运行 Gate2 时使用，可留空"></textarea></div>
           </div>
           <div class="two"><div><label>Threshold</label><input id="g1Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g1TriggeredBy" value="ui"></div></div>
-          <button onclick="runGate1()">Run Gate1</button>
-          <pre id="g1Out">等待运行...</pre>
+          <button onclick="runGate1()">运行 Gate1</button>
+          <pre id="g1Out" class="out"></pre>
         </div>
 
         <div class="card">
@@ -204,28 +227,29 @@ specs/implementation-plan.md</textarea></div>
           </div>
           <label>Gate1 Report Path（可留空：同 task 下自动查找最新 Gate1 report）</label><input id="g2Gate1Report" value="">
           <div class="two"><div><label>Threshold</label><input id="g2Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g2TriggeredBy" value="ui-direct-gate2"></div></div>
-          <button onclick="runGate2()">Run Gate2</button>
-          <pre id="g2Out">等待运行...</pre>
+          <button onclick="runGate2()">运行 Gate2</button>
+          <pre id="g2Out" class="out"></pre>
         </div>
       </div>
     </section>
 
     <section id="taskList" class="tab">
       <div class="card">
-        <h3>Review工单详情</h3>
+        <h3>Review 工单详情</h3>
         <div class="three"><div><label>Product</label><select id="filterProduct"></select></div><div><label>Version</label><select id="filterVersion"></select></div><div><label>Task</label><select id="filterTask"></select></div></div>
-        <div class="row"><button onclick="loadTasks()">Search</button><button class="secondary" onclick="clearFilters()">Show All</button></div>
+        <div class="row"><button onclick="loadTasks()">筛选</button><button class="secondary" onclick="clearFilters()">显示全部</button></div>
         <div class="tableWrap"><table><thead><tr><th>Serial / Code</th><th>Product / Version</th><th>Task Name</th><th>Flow / Result</th><th>Gate1</th><th>Gate2</th><th>Approval / Trigger</th><th>Auto Gate2</th><th>Final</th><th>Action</th></tr></thead><tbody id="tasksBody"></tbody></table></div>
-        <pre id="taskOut">等待加载...</pre>
+        <pre id="taskOut" class="out"></pre>
       </div>
     </section>
 
     <section id="reports" class="tab">
       <div class="card">
+        <h3>报告评审与审批</h3>
         <div class="three"><div><label>Task</label><select id="reportTask" onchange="onReportTaskChange()"></select></div><div><label>Review ID</label><select id="reportReview" onchange="onReviewSelect()"></select></div><div><label>Reviewer</label><input id="reviewer" value="security.reviewer@example.com"></div></div>
-        <div class="row"><button class="secondary" onclick="openReport()">Open</button><button class="secondary" onclick="downloadReport()">Download</button><button class="secondary" onclick="loadReportForEdit()">Load for Edit</button><button onclick="saveReport()">Save Edited Report</button><button class="ok" onclick="approveSelectedReport()">Approve</button></div>
+        <div class="row"><button class="secondary" onclick="openReport()">查看</button><button class="secondary" onclick="downloadReport()">下载</button><button class="secondary" onclick="loadReportForEdit()">载入编辑</button><button onclick="saveReport()">保存修改</button><button class="ok" onclick="approveSelectedReport()">审批通过</button><button class="warn" id="jiraBtn" onclick="sendReportToJira()">发送到 Jira</button></div>
         <label>Report Content</label><textarea id="reportContent" style="min-height:360px"></textarea>
-        <pre id="reportOut">等待操作...</pre>
+        <pre id="reportOut" class="out"></pre>
       </div>
     </section>
 
@@ -234,7 +258,7 @@ specs/implementation-plan.md</textarea></div>
         <div class="card">
           <h3>Golden Knowledge Base</h3>
           <div class="two"><div><label>Gate</label><select id="kbGate" onchange="onKbGateChange()"><option value="gate1">gate1</option><option value="gate2">gate2</option></select></div><div><label>Knowledge Base</label><select id="kbId"></select></div></div>
-          <div class="row"><button class="secondary" onclick="loadKbCatalogs()">Refresh Catalog</button><button class="secondary" onclick="loadKb()">Load KB</button><button onclick="saveKb()">Manual Save KB</button><button class="secondary" onclick="loadKbHistory()">History</button></div>
+          <div class="row"><button class="secondary" onclick="loadKbCatalogs()">刷新目录</button><button class="secondary" onclick="loadKb()">载入 KB</button><button onclick="saveKb()">保存 KB</button><button class="secondary" onclick="loadKbHistory()">变更历史</button></div>
           <div class="three"><div><label>Version</label><input id="kbVersion" value="1.0.1"></div><div><label>Updated By</label><input id="kbUpdatedBy" value="security.admin@example.com"></div><div><label>Reason</label><input id="kbReason" value="Manual update from UI"></div></div>
           <label>KB JSON</label><textarea id="kbContent" style="min-height:420px"></textarea>
         </div>
@@ -244,10 +268,10 @@ specs/implementation-plan.md</textarea></div>
           <div class="two"><div><label>Knowledge Base ID</label><input id="kbUploadId" placeholder="cloud-service"></div><div><label>Name</label><input id="kbUploadName" placeholder="Cloud Service KB"></div></div>
           <div class="two"><div><label>Category</label><input id="kbUploadCategory" placeholder="Cloud Service"></div><div><label>Risk Level</label><input id="kbUploadRisk" placeholder="Yellow"></div></div>
           <label>Description</label><input id="kbUploadDescription" placeholder="适用于云端服务的金标准知识库">
-          <button onclick="uploadKb()">Upload KB</button>
+          <button onclick="uploadKb()">上传 KB</button>
           <h3 style="margin-top:18px">Catalog</h3>
-          <div class="tableWrap"><table><thead><tr><th>ID</th><th>Name</th><th>Category / Risk</th><th>Version</th><th>Scenarios</th><th>Action</th></tr></thead><tbody id="kbCatalogBody"></tbody></table></div>
-          <pre id="kbOut">等待操作...</pre>
+          <div class="tableWrap short"><table><thead><tr><th>ID</th><th>Name</th><th>Category / Risk</th><th>Version</th><th>Scenarios</th><th>Action</th></tr></thead><tbody id="kbCatalogBody"></tbody></table></div>
+          <pre id="kbOut" class="out"></pre>
         </div>
       </div>
     </section>
@@ -293,7 +317,7 @@ python cli/security_gate_cli.py gate2 run \
 </div>
 
 <script>
-const state={catalog:null,tasks:[],specs:[],kbs:{gate1:[],gate2:[]},inputSources:{g1:'docs',g1Gate2:'docs',g2:'docs'},selectedTask:'',selectedReview:''};
+const state={catalog:null,tasks:[],specs:[],kbs:{gate1:[],gate2:[]},jira:null,inputSources:{g1:'docs',g1Gate2:'docs',g2:'docs'},selectedTask:'',selectedReview:''};
 const byId=id=>document.getElementById(id);
 const lines=id=>byId(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
 const inlineDocs=(id,name)=>{const content=byId(id).value.trim();return content?[{name,content}]:[];};
@@ -312,13 +336,17 @@ function updateInputSource(group){const mode=state.inputSources[group]||'docs',f
 function initInputSources(){Object.keys(sourceFields).forEach(updateInputSource);}
 function selectedInputPayload(group,docsId,pasteId,pasteName,outId,label){const mode=state.inputSources[group]||'docs',documents=mode==='paste'?[]:lines(docsId),documentTexts=mode==='docs'?[]:inlineDocs(pasteId,pasteName);if(!documents.length&&!documentTexts.length){show(outId,`${label} 已选择「${sourceModeText[mode]}」，但没有可提交内容。`);return null;}return {documents,document_texts:documentTexts};}
 function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();if(id==='kb')loadKbCatalogs();}
-async function health(){try{show('healthOut',await fetchJson('/api/v1/health'));}catch(e){show('healthOut',e.message)}}
-async function refreshAll(){await loadCatalog();await loadSpecs();await loadKbCatalogs();await loadStats();await loadTasks();}
+async function health(){const el=byId('healthBadge');try{const d=await fetchJson('/api/v1/health');const ok=d.status==='ok';el.textContent=ok?'服务正常':'服务异常';el.className='badge '+(ok?'ok':'danger');}catch(e){el.textContent='服务不可达';el.className='badge danger';show('healthOut','健康检查失败: '+e.message);}}
+async function loadJiraSettings(){try{state.jira=await fetchJson('/api/v1/integrations/jira');}catch(e){state.jira={configured:false,missing:[]};}const btn=byId('jiraBtn');if(btn)btn.title=state.jira.configured?`发送到 ${state.jira.base_url} / ${state.jira.project_key}`:'Jira 未配置，需要设置 '+(state.jira.missing||[]).join('、');}
+async function pushToJira(reviewId,outId){if(!reviewId)return show(outId,'请先选择一份报告。');if(state.jira&&!state.jira.configured)return show(outId,'Jira 未配置。请在 .env 中设置：'+(state.jira.missing||[]).join('、'));try{show(outId,`正在发送 ${reviewId} 到 Jira...`);const d=await fetchJson(`/api/v1/reports/${encodeURIComponent(reviewId)}/jira`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});show(outId,d);}catch(e){show(outId,'发送到 Jira 失败: '+e.message);}}
+function sendReportToJira(){return pushToJira(currentReview(),'reportOut');}
+function sendReviewToJira(reviewId){return pushToJira(reviewId,'taskOut');}
+async function refreshAll(){await loadCatalog();await loadSpecs();await loadKbCatalogs();await loadStats();await loadTasks();await loadJiraSettings();await health();}
 async function loadStats(){const s=await fetchJson('/api/v1/dashboard/stats');byId('mTask').textContent=s.task_count||0;byId('mActivity').textContent=s.activity_count||0;byId('mReport').textContent=s.report_count||0;byId('mApproved').textContent=s.approved_count||0;byId('latestTasksBody').innerHTML=(s.latest_tasks||[]).map(taskRowCompact).join('')||'<tr><td colspan="5" class="muted">No tasks</td></tr>';}
 async function loadCatalog(){state.catalog=await fetchJson('/api/v1/catalog');state.tasks=state.catalog.tasks||[];fillFilters();fillReportTaskSelect();}
 function formatBytes(size){const n=Number(size||0);if(n<1024)return `${n} B`;if(n<1024*1024)return `${(n/1024).toFixed(1)} KB`;return `${(n/1024/1024).toFixed(1)} MB`;}
 function appendSpecPath(targetId,path){const el=byId(targetId),docs=lines(targetId);if(!docs.includes(path)){docs.push(path);el.value=docs.join('\n');}show('specOut',`已加入 ${path}`);}
-function renderSpecs(){const body=byId('specsBody');if(!body)return;body.innerHTML=(state.specs||[]).map(item=>`<tr><td>${esc(item.filename)}</td><td><code>${esc(item.path)}</code></td><td>${esc(formatBytes(item.size))}</td><td>${esc(formatDateTime(item.updated_at||''))}</td><td><button class="secondary inline" onclick="appendSpecPath('g1Docs','${esc(item.path)}')">Gate1</button><button class="secondary inline" onclick="appendSpecPath('g1Gate2Docs','${esc(item.path)}')">Gate1→Gate2</button><button class="secondary inline" onclick="appendSpecPath('g2Docs','${esc(item.path)}')">Gate2</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No spec files</td></tr>';}
+function renderSpecs(){const body=byId('specsBody');if(!body)return;const items=state.specs||[];const count=byId('specCount');if(count)count.textContent=`${items.length} 个文件`;body.innerHTML=items.map(item=>`<tr><td>${esc(item.filename)}</td><td><code>${esc(item.path)}</code></td><td>${esc(formatBytes(item.size))}</td><td>${esc(formatDateTime(item.updated_at||''))}</td><td><button class="secondary inline" onclick="appendSpecPath('g1Docs','${esc(item.path)}')">Gate1</button><button class="secondary inline" onclick="appendSpecPath('g1Gate2Docs','${esc(item.path)}')">Gate1→Gate2</button><button class="secondary inline" onclick="appendSpecPath('g2Docs','${esc(item.path)}')">Gate2</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No spec files</td></tr>';}
 async function loadSpecs(){try{const d=await fetchJson('/api/v1/specs');state.specs=d.items||[];renderSpecs();}catch(e){show('specOut','Spec 列表加载失败: '+e.message);}}
 async function uploadSpecs(){const input=byId('specUpload'),files=[...(input.files||[])];if(!files.length)return show('specOut','请选择要上传的 spec 文件。');const form=new FormData();files.forEach(file=>form.append('files',file));try{const r=await fetch('/api/v1/specs/upload',{method:'POST',body:form}),d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));input.value='';show('specOut',d);await loadSpecs();}catch(e){show('specOut','上传失败: '+e.message);}}
 function kbLabel(item){return `${item.knowledge_base_id} - ${item.name||''} (${item.category||'General'} / ${item.risk_level||''})`;}
@@ -338,7 +366,7 @@ function fillReportTaskSelect(){fillSelect('reportTask',state.tasks,state.select
 function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${esc(formatDateTime(t.updated_at||''))}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td></tr>`;}
 function reportLinks(t,gate){const url=t[`latest_${gate}_report_url`], dl=t[`latest_${gate}_download_url`];return url?`<span class="badge ${gate==='gate1'?'ok':'warn'}">${gate}</span> <a target="_blank" href="${esc(url)}">View</a>/<a target="_blank" href="${esc(dl)}">Download</a><br>`:`<span class="badge">${gate}: -</span><br>`;}
 async function loadTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(t=>t.product_name===p);if(v)rows=rows.filter(t=>t.product_version===v);if(tid)rows=rows.filter(t=>t.task_id===tid);byId('tasksBody').innerHTML=rows.map(taskRowFull).join('')||'<tr><td colspan="10" class="muted">No tasks</td></tr>';show('taskOut',{count:rows.length});}
-function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(formatDateTime(ag.triggered_at||ag.completed_at||''))}</span><br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
+function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(formatDateTime(ag.triggered_at||ag.completed_at||''))}</span><br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}${t.latest_gate1_review_id?`<button class="warn inline" onclick="sendReviewToJira('${esc(t.latest_gate1_review_id)}')">G1 → Jira</button>`:''}${t.latest_gate2_review_id?`<button class="warn inline" onclick="sendReviewToJira('${esc(t.latest_gate2_review_id)}')">G2 → Jira</button>`:''}</td></tr>`;}
 function finalLinks(t){const view=t.final_report_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report`;const dl=t.final_report_download_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report/download`;return `<a target="_blank" href="${esc(view)}">Final</a><br><a target="_blank" href="${esc(dl)}">Download</a>`;}
 function approvalText(x){return x?`${esc(x.approved_by)}<br><span class="small muted">${esc(formatDateTime(x.approved_at))}</span>`:'-';}
 function clearFilters(){byId('filterProduct').value='';byId('filterVersion').value='';byId('filterTask').value='';loadTasks();}

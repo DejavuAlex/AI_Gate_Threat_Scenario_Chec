@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from . import config
-from .schemas import ApproveRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
+from .schemas import ApproveRequest, JiraSendRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
+from .services import jira as jira_service
 from .services.knowledge_base import KnowledgeBaseService
 from .services.review import ReviewService
 
@@ -292,6 +293,33 @@ def download_report(review_id: str):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="report not found")
     return FileResponse(path=path, filename=path.name, media_type="text/markdown")
+
+
+@router.get("/integrations/jira")
+def jira_settings():
+    return jira_service.settings()
+
+
+@router.post("/reports/{review_id}/jira")
+def send_report_to_jira(review_id: str, request: JiraSendRequest):
+    try:
+        content = review_service.get_report_content(review_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="report not found")
+    try:
+        review = review_service.get(review_id)
+    except FileNotFoundError:
+        review = {}
+    gate = review.get("gate", "")
+    summary = request.summary or f"[AI Security Gate] {gate or 'Review'} report {review_id}"
+    labels = request.labels or ["ai-security-gate"] + ([gate] if gate else [])
+    try:
+        created = jira_service.create_issue(summary, content, labels)
+    except jira_service.JiraNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except jira_service.JiraError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"review_id": review_id, **created}
 
 
 @router.put("/reports/{review_id}")

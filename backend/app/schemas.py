@@ -39,6 +39,11 @@ class ReportUpdateRequest(BaseModel):
     comment: str | None = None
 
 
+class JiraSendRequest(BaseModel):
+    summary: str | None = None
+    labels: list[str] | None = None
+
+
 class KnowledgeBaseUpdateRequest(BaseModel):
     knowledge_base_id: str = "default"
     version: str

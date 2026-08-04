@@ -197,7 +197,10 @@ def test_gate1_report_adds_threat_modeling_sections_without_replacing_original_c
     assert "#### Initial Risk Estimation" in report
     assert "#### Risk Control" in report
     assert "#### Residual Risk Estimation" in report
-    assert "Control-dependent / Pending validation" in report
-    assert "#### Scenario Content" in report
+    assert "| Risk Score (P x Severity) | 24 |" in report
+    assert "| Residual Risk Level | Green |" in report
+    assert "| Residual P (combined probability) | 1.5 |" in report
+    assert "| Residual Risk Score (P x Severity) | 12 |" in report
+    assert "| Assumed Control Effectiveness | 50% over 1 control(s) |" in report
     assert "#### Required Security Controls" in report
     assert "Require approval before export" in report

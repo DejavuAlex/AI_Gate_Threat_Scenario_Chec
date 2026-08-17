@@ -33,7 +33,7 @@ class LLMClient:
             from openai import OpenAI
         except ImportError as exc:
             raise RuntimeError("The installed openai package does not provide OpenAI. Install dependencies with: pip install -r requirements-dev.txt") from exc
-        return OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout)
+        return OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout, max_retries=0)
 
     @staticmethod
     def _parse_json(content: str) -> dict[str, Any]:
@@ -61,7 +61,9 @@ class LLMClient:
                 temperature=self.temperature,
                 response_format={"type": "json_object"},
             )
-        except Exception:
+        except Exception as exc:
+            if getattr(exc, "status_code", None) not in {400, 404, 422}:
+                raise
             response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,

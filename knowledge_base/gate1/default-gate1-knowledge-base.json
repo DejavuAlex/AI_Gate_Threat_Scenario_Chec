@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "knowledge_base_version": "1.0.0",
+  "knowledge_base_version": "1.0.1",
   "gate": "Gate1",
   "name": "Gate1 Business Requirement Threat Modeling Golden Knowledge Base",
   "description": "用于业务需求阶段的自动化威胁建模、安全评审和安全控制措施生成。",
@@ -23,7 +23,7 @@
       "name": "文件上传或数据上传业务",
       "problem_scenario": "是否存在文件上传/数据上传业务场景？",
       "category": "File Upload",
-      "business_indicators": ["文件上传", "图片上传", "附件上传", "数据上传", "导入文件", "上传资料"],
+      "business_indicators": ["文件上传", "图片上传", "附件上传", "上传附件", "文档上传", "数据上传", "导入文件", "上传资料"],
       "negative_indicators": ["不支持文件上传", "仅本地处理不上传"],
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["攻击者上传恶意脚本/木马实现远程代码执行", "通过超大文件发动存储型DoS攻击", "上传包含XSS的HTML/SVG文件实现客户端攻击"],
@@ -199,7 +199,21 @@
       "name": "URL敏感参数传递",
       "problem_scenario": "是否通过URL传递敏感参数？",
       "category": "Sensitive URL Parameter",
-      "business_indicators": ["URL参数", "user_id", "token", "订单号", "敏感参数", "GET请求"],
+      "business_indicators": ["URL敏感参数", "URL参数", "查询参数", "query parameter", "user_id", "token", "订单号", "敏感参数", "GET请求"],
+      "match_context": {
+        "any_of": [
+          ["URL敏感参数"],
+          ["敏感参数", "URL"],
+          ["token", "URL"],
+          ["token", "查询参数"],
+          ["token", "query parameter"],
+          ["token", "GET请求"],
+          ["user_id", "URL"],
+          ["user_id", "GET请求"],
+          ["订单号", "URL"],
+          ["订单号", "GET请求"]
+        ]
+      },
       "negative_indicators": ["不通过URL传递敏感信息"],
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["参数篡改实现越权访问", "Referer泄漏敏感URL"],
@@ -210,7 +224,21 @@
       "name": "第三方登录",
       "problem_scenario": "是否支持微信/Google等第三方登录？",
       "category": "Federated Login",
-      "business_indicators": ["第三方登录", "OAuth", "微信登录", "Google登录", "SSO"],
+      "business_indicators": ["第三方登录", "联邦登录", "社交登录", "OAuth", "OAuth2", "OIDC", "微信登录", "Google登录", "SSO", "SAML"],
+      "match_context": {
+        "any_of": [
+          ["第三方登录"],
+          ["联邦登录"],
+          ["社交登录"],
+          ["微信登录"],
+          ["Google登录"],
+          ["OAuth", "登录"],
+          ["OAuth2", "登录"],
+          ["OIDC", "登录"],
+          ["SSO", "登录"],
+          ["SAML", "登录"]
+        ]
+      },
       "negative_indicators": ["不支持第三方登录"],
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["OAuth回调地址劫持窃取授权码", "用户身份伪造攻击"],
@@ -232,7 +260,17 @@
       "name": "GraphQL接口",
       "problem_scenario": "是否使用GraphQL API？",
       "category": "GraphQL",
-      "business_indicators": ["GraphQL", "schema", "resolver", "复杂查询"],
+      "business_indicators": ["GraphQL", "schema", "resolver", "introspection", "mutation", "query depth", "复杂查询"],
+      "match_context": {
+        "any_of": [
+          ["GraphQL"],
+          ["resolver"],
+          ["introspection"],
+          ["query depth"],
+          ["mutation", "schema"],
+          ["复杂查询", "GraphQL"]
+        ]
+      },
       "negative_indicators": ["不使用GraphQL"],
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["恶意复杂查询耗尽服务器资源", "未授权访问私有字段"],

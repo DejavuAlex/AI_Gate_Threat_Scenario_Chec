@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from . import config
@@ -331,21 +331,24 @@ def update_report(review_id: str, request: ReportUpdateRequest):
 
 
 @router.post("/reports/{review_id}/approve")
-def approve_report(review_id: str, request: ApproveRequest):
+def approve_report(review_id: str, request: ApproveRequest, background_tasks: BackgroundTasks):
     try:
-        return review_service.approve(review_id, request.reviewer, request.comment)
+        result = review_service.approve(review_id, request.reviewer, request.comment)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="review not found")
+    if result.get("auto_gate2_triggered"):
+        background_tasks.add_task(review_service.run_auto_gate2, review_id)
+    return result
 
 
 @router.post("/security-review/gate1/{review_id}/approve")
-def approve_gate1_report(review_id: str, request: ApproveRequest):
-    return approve_report(review_id, request)
+def approve_gate1_report(review_id: str, request: ApproveRequest, background_tasks: BackgroundTasks):
+    return approve_report(review_id, request, background_tasks)
 
 
 @router.post("/security-review/gate2/{review_id}/approve")
-def approve_gate2_report(review_id: str, request: ApproveRequest):
-    return approve_report(review_id, request)
+def approve_gate2_report(review_id: str, request: ApproveRequest, background_tasks: BackgroundTasks):
+    return approve_report(review_id, request, background_tasks)
 
 
 @router.get("/knowledge-base/{gate}/catalog")

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "knowledge_base_version": "1.0.0",
+  "knowledge_base_version": "1.0.1",
   "gate": "Gate2",
   "name": "Gate2 Architecture and Code Requirement Threat Modeling Golden Knowledge Base",
   "description": "用于架构设计、详细设计、API设计、数据流和代码级需求阶段的自动化安全评审。",
@@ -217,6 +217,17 @@
       "problem_scenario": "系统是否通过URL传递用户ID、订单ID、token或其他敏感参数？",
       "category": "Sensitive URL Parameter",
       "technical_indicators": ["query parameter", "user_id", "token", "order_id", "GET"],
+      "match_context": {
+        "any_of": [
+          ["token", "query parameter"],
+          ["token", "URL"],
+          ["token", "GET"],
+          ["user_id", "query parameter"],
+          ["user_id", "GET"],
+          ["order_id", "query parameter"],
+          ["order_id", "GET"]
+        ]
+      },
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["参数篡改实现越权", "Referer泄漏敏感URL"],
       "security_control_requirements": ["关键参数服务端签名", "敏感操作禁用GET", "敏感参数不得出现在URL中", "配置Referrer-Policy"],
@@ -229,6 +240,18 @@
       "problem_scenario": "系统是否实现微信、Google、企业SSO等第三方登录？",
       "category": "OAuth Security",
       "technical_indicators": ["OAuth", "OIDC", "SSO", "redirect_uri", "state", "authorization code"],
+      "match_context": {
+        "any_of": [
+          ["第三方登录"],
+          ["联邦登录"],
+          ["微信登录"],
+          ["Google登录"],
+          ["OAuth", "登录"],
+          ["OIDC", "登录"],
+          ["SSO", "登录"],
+          ["redirect_uri", "authorization code"]
+        ]
+      },
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["OAuth回调地址劫持", "授权码泄露", "用户身份伪造"],
       "security_control_requirements": ["严格校验state参数", "校验redirect_uri", "授权码一次性使用", "绑定手机号二次验证"],
@@ -253,6 +276,14 @@
       "problem_scenario": "系统是否实现GraphQL API、Schema或Resolver？",
       "category": "GraphQL Security",
       "technical_indicators": ["GraphQL", "resolver", "schema", "introspection", "query depth"],
+      "match_context": {
+        "any_of": [
+          ["GraphQL"],
+          ["resolver"],
+          ["introspection"],
+          ["query depth"]
+        ]
+      },
       "risk": {"P1": 6, "P2": 6, "P": 3, "severity": 8, "level": "Yellow"},
       "risk_identification": ["恶意复杂查询耗尽资源", "未授权访问私有字段"],
       "security_control_requirements": ["限制查询深度和复杂度", "按角色限制字段访问", "生产环境禁用Introspection", "限制单次查询返回数据量"],

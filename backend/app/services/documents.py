@@ -73,8 +73,9 @@ def extract_stories(docs: list[dict[str, str]]) -> list[dict[str, str]]:
             start = match.start()
             end = matches[pos + 1].start() if pos + 1 < len(matches) else len(content)
             section = content[start:end].strip()
+            body = content[match.end():end].strip()
             title = match.group(2).strip()
-            if not section:
+            if not section or not body:
                 continue
             stories.append({"story_id": _story_id(title, index), "title": title, "document_path": path, "content": section})
             index += 1

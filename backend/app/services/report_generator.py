@@ -177,10 +177,22 @@ def _scenario_markdown(item: dict[str, Any], model: dict[str, Any] | None = None
     if item.get("matched_evidence"):
         lines.extend([f"- {e}" for e in item["matched_evidence"]])
     else:
-        lines.append("- 无直接关键词证据，基于语义和上下文匹配。")
+        lines.append("- No direct positive indicator quote was retained.")
+    if item.get("negative_evidence"):
+        lines.extend(["", "#### Negative / Excluded Evidence", ""])
+        lines.extend([f"- {e}" for e in item["negative_evidence"]])
     if item.get("matched_reason"):
         lines.extend(["", "#### LLM Matched Reason", "", f"- {item['matched_reason']}"])
-    lines.extend(["", "#### Match Score Calculation", "", "| Metric | Score |", "|---|---:|"])
+    lines.extend([
+        "",
+        "#### Match Score Calculation",
+        "",
+        "> Final Score is recomputed from the configured weighted components. "
+        "negative_evidence_adjustment is subtracted; no component is raised to the threshold.",
+        "",
+        "| Metric | Score |",
+        "|---|---:|",
+    ])
     for key, value in item.get("score_breakdown", {}).items():
         lines.append(f"| {key} | {value} |")
     lines.append(f"| Final Score | {item.get('final_score')} |")
@@ -222,7 +234,13 @@ def _metadata_lines(review_id: str, work_order_id: str, request: Any, gate: str,
 
 
 def _story_assessments_markdown(match_result: dict[str, Any]) -> list[str]:
-    lines = ["", "## 3. Story-by-Story Threat Scenario Assessment", ""]
+    lines = [
+        "",
+        "## 3. Story-by-Story Threat Scenario Assessment",
+        "",
+        "> Story rows are projections of verified Overall matches. A scenario appears under a story only when that story contains positive local evidence; Non-goals and locally negated text are excluded.",
+        "",
+    ]
     story_assessments = match_result.get("story_assessments", [])
     if not story_assessments:
         lines.append("- No story-level assessment data available.")
@@ -232,17 +250,25 @@ def _story_assessments_markdown(match_result: dict[str, Any]) -> list[str]:
             f"### {story.get('story_id')} - {story.get('title')}",
             "",
             f"- Source Document: {story.get('document_path')}",
-            f"- Story Matched: {'Yes' if story.get('matched') else 'No'}",
+            f"- Matched in this story: {'Yes' if story.get('matched') else 'No'}",
             "",
-            "| Scenario ID | Scenario Name | Matched | Final Score | Semantic | Keyword | Context | Negative Adj. | Risk |",
-            "|---|---|---:|---:|---:|---:|---:|---:|---|",
         ])
-        for item in story.get("top_scenarios", []):
+        story_scenarios = story.get("top_scenarios", [])
+        if not story_scenarios:
+            lines.extend(["- No verified Overall scenario has positive evidence in this story.", ""])
+            continue
+        lines.extend([
+            "| Scenario ID | Scenario Name | Matched in this story | Overall Final Score | Story Evidence Score | Semantic | Keyword | Context | Negative Penalty | Risk | Evidence |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
+        ])
+        for item in story_scenarios:
             sb = item.get("score_breakdown", {})
+            evidence = "<br>".join(str(value).replace("|", "\\|") for value in item.get("matched_evidence", []))
             lines.append(
                 f"| {item.get('scenario_id')} | {item.get('scenario_name')} | {'Yes' if item.get('matched') else 'No'} | "
-                f"{item.get('final_score')} | {sb.get('semantic_similarity')} | {sb.get('keyword_match')} | "
-                f"{sb.get('context')} | {sb.get('negative_evidence_adjustment')} | {item.get('risk_level') or ''} |"
+                f"{item.get('overall_final_score', item.get('final_score'))} | {item.get('local_evidence_score', item.get('final_score'))} | "
+                f"{sb.get('semantic_similarity')} | {sb.get('keyword_match')} | {sb.get('context')} | "
+                f"{sb.get('negative_evidence_adjustment')} | {item.get('risk_level') or ''} | {evidence} |"
             )
         lines.append("")
     return lines

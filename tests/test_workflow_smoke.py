@@ -61,6 +61,19 @@ def test_extract_stories_splits_markdown_headings_and_falls_back_to_document():
     assert stories[2]["title"] == "plain.txt"
 
 
+def test_extract_stories_skips_parent_heading_without_body():
+    docs = [
+        {
+            "path": "specs/product.md",
+            "content": "# Product Requirements\n\n## Business Functions\nUsers upload files.",
+        }
+    ]
+
+    stories = extract_stories(docs)
+
+    assert [story["title"] for story in stories] == ["Business Functions"]
+
+
 def test_matching_engine_assess_stories_returns_top_scenario_scores():
     kb = {
         "matching_policy": {

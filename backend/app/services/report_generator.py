@@ -166,7 +166,11 @@ def _threat_modeling_sections(item: dict[str, Any], model: dict[str, Any] | None
     return lines
 
 
-def _scenario_markdown(item: dict[str, Any], model: dict[str, Any] | None = None) -> str:
+def _scenario_markdown(
+    item: dict[str, Any],
+    model: dict[str, Any] | None = None,
+    include_required_controls: bool = True,
+) -> str:
     scenario = item["scenario"]
     lines = [
         f"### Scenario: {scenario.get('id')} {scenario.get('name')}",
@@ -196,9 +200,10 @@ def _scenario_markdown(item: dict[str, Any], model: dict[str, Any] | None = None
     for key, value in item.get("score_breakdown", {}).items():
         lines.append(f"| {key} | {value} |")
     lines.append(f"| Final Score | {item.get('final_score')} |")
-    lines.extend(["", "#### Required Security Controls", ""])
-    controls = item.get("optimized_security_controls") or scenario.get("security_control_requirements", [])
-    lines.extend([f"- {control}" for control in controls])
+    if include_required_controls:
+        lines.extend(["", "#### Required Security Controls", ""])
+        controls = item.get("optimized_security_controls") or scenario.get("security_control_requirements", [])
+        lines.extend([f"- {control}" for control in controls])
     lines.append("")
     return "\n".join(lines)
 
@@ -328,27 +333,65 @@ def generate_gate2_report(review_id: str, work_order_id: str, request: Any, kb: 
         lines.extend([match_result.get("unmatched_message", "未匹配上任何威胁场景，本次安全评估确认无安全风险。"), ""])
     else:
         for item in match_result.get("matched_scenarios", []):
-            lines.append(_scenario_markdown(item, model))
-    lines.extend(["", "## 5. Gate1 Security Control Verification", "", "| Control | Result | Evidence |", "|---|---|---|"])
-    for item in verification.get("items", []):
-        lines.append(f"| {item['control']} | {item['result']} | {item['evidence']} |")
-    findings = [item for item in verification.get("items", []) if item["result"] != "Implemented"]
-    lines.extend(["", "## 6. Non-compliance Findings", ""])
-    if findings:
-        for item in findings:
-            lines.append(f"- {item['control']}: {item['result']}，建议补充到 Gate2 需求文档。")
+            # Risk Control above is the single canonical Gate2 control list.
+            lines.append(_scenario_markdown(item, model, include_required_controls=False))
+
+    items = verification.get("items", [])
+    documented = int(verification.get("documented", verification.get("implemented", 0)) or 0)
+    partial = int(verification.get("partial", 0) or 0)
+    no_evidence = int(verification.get("no_evidence", verification.get("not_implemented", 0)) or 0)
+    gaps = [item for item in items if item.get("result") not in {"Documented", "Implemented"}]
+    baseline_available = bool(verification.get("baseline_available", items))
+
+    lines.extend([
+        "",
+        "## 5. Gate1-to-Gate2 Security Control Traceability",
+        "",
+        "> This section checks only the final controls inherited from Gate1. Gate2 scenario controls are listed once under Risk Control in section 4.",
+        "> Documented means explicit design evidence was found; it is not a code-level implementation or vulnerability verdict.",
+        "",
+        f"- Baseline Source: {verification.get('controls_source', 'Gate1 Final Security Control Requirements')}",
+        f"- Summary: {documented} documented / {partial} partial / {no_evidence} with no explicit evidence",
+        "",
+    ])
+    if items:
+        lines.extend([
+            "| Gate1 Control | Traceability | Evidence Basis | Gate2 Evidence | Required Action |",
+            "|---|---|---|---|---|",
+        ])
+        for item in items:
+            control = str(item.get("control", "")).replace("|", "\\|")
+            basis = str(item.get("evidence_basis", "Legacy literal check")).replace("|", "\\|")
+            evidence = str(item.get("evidence", "")).replace("|", "\\|")
+            action = str(item.get("required_action") or ("None." if item.get("result") in {"Documented", "Implemented"} else "Add explicit Gate2 design evidence and an acceptance criterion.")).replace("|", "\\|")
+            lines.append(f"| {control} | {item.get('result', '')} | {basis} | {evidence} | {action} |")
     else:
-        lines.append("- 未发现 Gate1 控制措施未落实项。")
-    lines.extend(["", "## 7. Optimized Gate2 Requirement Updates", ""])
-    for item in findings:
-        lines.append(f"- 建议在架构/API/实现计划中增加：{item['control']}")
-    if not findings:
-        lines.append("- 暂无额外文档优化建议。")
-    lines.extend(["", "## 8. Final Security Control Requirements", ""])
-    controls = _final_controls(match_result)
-    if controls:
-        lines.extend([f"- {control}" for control in controls])
+        lines.append("- No Gate1 final-control baseline was available, so cross-gate traceability was not evaluated.")
+
+    if not baseline_available:
+        decision = "Gate1 Baseline Required"
+        rationale = "Provide or link the approved Gate1 report before making a cross-gate decision."
+    elif gaps:
+        decision = "Gate2 Document Update Required"
+        rationale = f"Resolve the {len(gaps)} partial or no-evidence row(s) in section 5, then rerun Gate2."
     else:
-        lines.append("- 无新增安全控制要求。")
-    lines.extend(["", "## 9. Conclusion", "", "Gate2 review completed.", ""])
+        decision = "Ready for Human Review"
+        rationale = "Every inherited Gate1 control has explicit Gate2 document evidence."
+    lines.extend([
+        "",
+        "## 6. Gate2 Review Decision",
+        "",
+        f"- Decision: {decision}",
+        f"- Rationale: {rationale}",
+        "- Scope: Document traceability only; source-code and runtime implementation still require separate verification.",
+        "- Automated Review Execution: Completed",
+        "",
+        "## 7. Human Review",
+        "",
+        "- Status: Pending",
+        "- Reviewer:",
+        "- Review Comment:",
+        "- Approved At:",
+        "",
+    ])
     return "\n".join(lines)

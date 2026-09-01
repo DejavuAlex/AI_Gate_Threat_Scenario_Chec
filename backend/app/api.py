@@ -430,6 +430,14 @@ def get_knowledge_base_history(gate: str, knowledge_base_id: str | None = Query(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/knowledge-base/{gate}/history/{history_id}")
+def get_knowledge_base_history_detail(gate: str, history_id: str):
+    try:
+        return kb_service.get_history(gate, history_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.put("/knowledge-base/{gate}")
 def update_knowledge_base(gate: str, request: KnowledgeBaseUpdateRequest):
     try:

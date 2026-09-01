@@ -67,15 +67,20 @@ def _adf_document(text: str) -> dict[str, Any]:
 
 def create_issue(summary: str, description: str, labels: list[str] | None = None) -> dict[str, Any]:
     url = _require_config()
-    payload = {
-        "fields": {
-            "project": {"key": config.JIRA_PROJECT_KEY},
-            "issuetype": {"name": config.JIRA_ISSUE_TYPE},
-            "summary": summary[:250],
-            "description": _adf_document(description),
-            "labels": labels or [],
-        }
+    fields: dict[str, Any] = {
+        "project": {"key": config.JIRA_PROJECT_KEY},
+        "issuetype": {"name": config.JIRA_ISSUE_TYPE},
+        "summary": summary[:250],
+        "description": _adf_document(description),
+        "labels": labels or [],
     }
+    # Without an explicit security level, Jira applies the issue type's
+    # configured default, which can be a level the reporting account cannot
+    # view, making the created issue invisible to everyone including the
+    # reporter. Setting it explicitly avoids that surprise.
+    if config.JIRA_SECURITY_LEVEL_ID:
+        fields["security"] = {"id": config.JIRA_SECURITY_LEVEL_ID}
+    payload = {"fields": fields}
     token = base64.b64encode(f"{config.JIRA_EMAIL}:{config.JIRA_API_TOKEN}".encode()).decode()
     request = urllib.request.Request(
         url,

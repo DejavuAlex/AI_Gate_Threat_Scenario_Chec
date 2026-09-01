@@ -114,4 +114,55 @@ def test_upload_and_select_classified_knowledge_base(tmp_path, monkeypatch):
 
     history_response = client.get("/api/v1/knowledge-base/gate1/history", params={"knowledge_base_id": "cloud-service"})
     assert history_response.status_code == 200
-    assert history_response.json()["items"][0]["knowledge_base_id"] == "cloud-service"
+    initial_history = history_response.json()["items"][0]
+    assert initial_history["knowledge_base_id"] == "cloud-service"
+    assert initial_history["change_summary"]["added_scenario_ids"] == ["CLOUD-001"]
+
+    loaded["scenarios"][0]["risk"]["level"] = "Red"
+    update_response = client.put(
+        "/api/v1/knowledge-base/gate1",
+        json={
+            "knowledge_base_id": "cloud-service",
+            "version": "1.2.4",
+            "updated_by": "reviewer@example.com",
+            "change_reason": "clarify cloud upload scenario",
+            "content": loaded,
+        },
+    )
+    assert update_response.status_code == 200
+
+    updated_history_response = client.get(
+        "/api/v1/knowledge-base/gate1/history",
+        params={"knowledge_base_id": "cloud-service"},
+    )
+    assert updated_history_response.status_code == 200
+    updated_history = updated_history_response.json()["items"][0]
+    assert updated_history["previous_version"] == "1.2.3"
+    assert updated_history["version"] == "1.2.4"
+    assert updated_history["change_summary"]["modified_scenario_ids"] == ["CLOUD-001"]
+    assert "knowledge_base_version" in updated_history["change_summary"]["changed_fields"]
+    listed_field_changes = updated_history["change_summary"]["field_changes"]
+    risk_change = next(
+        change for change in listed_field_changes
+        if change["path"] == "scenarios[CLOUD-001].risk.level"
+    )
+    assert risk_change["change_type"] == "modified"
+    assert risk_change["scenario_id"] == "CLOUD-001"
+    assert risk_change["field"] == "risk.level"
+    assert "previous_value" not in risk_change
+    assert "new_value" not in risk_change
+
+    detail_response = client.get(
+        f"/api/v1/knowledge-base/gate1/history/{updated_history['history_id']}"
+    )
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["change_reason"] == "clarify cloud upload scenario"
+    detailed_risk_change = next(
+        change for change in detail["change_summary"]["field_changes"]
+        if change["path"] == "scenarios[CLOUD-001].risk.level"
+    )
+    assert detailed_risk_change["previous_value"] == "Yellow"
+    assert detailed_risk_change["new_value"] == "Red"
+    assert detail["previous_snapshot"]["scenarios"][0]["risk"]["level"] == "Yellow"
+    assert detail["new_snapshot"]["scenarios"][0]["risk"]["level"] == "Red"

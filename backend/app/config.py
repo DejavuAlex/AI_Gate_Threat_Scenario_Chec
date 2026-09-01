@@ -50,3 +50,8 @@ JIRA_EMAIL = os.getenv("JIRA_EMAIL", "")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN", "")
 JIRA_ISSUE_TYPE = os.getenv("JIRA_ISSUE_TYPE", "Task")
 JIRA_TIMEOUT_SECONDS = float(os.getenv("JIRA_TIMEOUT_SECONDS", "30"))
+# Optional: some Jira projects apply a hidden default Issue Security Level to
+# new issues (via the project's security scheme) that the reporting account
+# cannot see, making created issues invisible on dashboards. Set this to an
+# security level id the reporting account can view/set to override that default.
+JIRA_SECURITY_LEVEL_ID = os.getenv("JIRA_SECURITY_LEVEL_ID", "")

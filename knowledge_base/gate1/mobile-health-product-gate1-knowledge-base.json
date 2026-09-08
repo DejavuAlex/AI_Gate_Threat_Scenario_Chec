@@ -1,0 +1,135 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "e2e-1.0.0",
+  "gate": "Gate1",
+  "name": "Mobile Health Product Gate1 KB",
+  "description": "Synthetic Gate1 knowledge base for mobile healthcare applications.",
+  "category": "Mobile Health Product",
+  "risk_level": "Yellow",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No mobile health threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.35,
+      "keyword_match": 0.25,
+      "business_context": 0.2,
+      "negative_evidence_adjustment": 0.1,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G1-MOBILE-001",
+      "name": "Clinical Deep Link Navigation",
+      "problem_scenario": "Can an external link open a patient or clinical workflow inside the mobile application?",
+      "category": "Mobile Navigation",
+      "business_indicators": [
+        "clinical deep link",
+        "universal link",
+        "app link",
+        "深度链接打开患者页面",
+        "外部链接唤起应用"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "no deep links",
+        "不支持深度链接",
+        "external links open browser only"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 5,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "An attacker-controlled deep link may navigate to a sensitive screen with tampered identifiers.",
+        "A competing application may hijack an unverified custom URL scheme."
+      ],
+      "security_control_requirements": [
+        "Allow only verified HTTPS app links from approved domains.",
+        "Require an authenticated and authorized session before opening clinical content.",
+        "Validate every deep-link route and object identifier against an allowlist."
+      ]
+    },
+    {
+      "id": "G1-MOBILE-002",
+      "name": "Offline Clinical Data Cache",
+      "problem_scenario": "Does the mobile product retain patient or clinical data for offline use?",
+      "category": "Mobile Data Protection",
+      "business_indicators": [
+        "offline clinical data",
+        "patient data cache",
+        "离线查看患者数据",
+        "本地缓存病例"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "online only",
+        "不缓存患者数据",
+        "no offline access"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 6,
+        "P": 3,
+        "severity": 10,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Clinical data stored on a lost or compromised device may be disclosed.",
+        "Cached records may remain accessible after account logout or device reassignment."
+      ],
+      "security_control_requirements": [
+        "Encrypt offline clinical data with a device-bound platform key.",
+        "Apply a documented retention limit and securely purge data on logout.",
+        "Prevent sensitive clinical content from appearing in backups or screenshots."
+      ]
+    },
+    {
+      "id": "G1-MOBILE-003",
+      "name": "Biometric Sign-In",
+      "problem_scenario": "Can users sign in or unlock sensitive clinical data with device biometrics?",
+      "category": "Mobile Authentication",
+      "business_indicators": [
+        "biometric sign-in",
+        "Face ID login",
+        "fingerprint unlock",
+        "生物识别登录",
+        "指纹解锁"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "no biometric authentication",
+        "不使用生物识别",
+        "password only"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 5,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Weak biometric fallback may bypass the intended authentication strength.",
+        "A stale biometric session may expose clinical data after risk conditions change."
+      ],
+      "security_control_requirements": [
+        "Use the platform biometric API and require strong biometric authentication.",
+        "Never store or process raw biometric templates in the application.",
+        "Require server reauthentication for high-risk actions and after session expiry."
+      ]
+    }
+  ],
+  "metadata": {
+    "knowledge_base_id": "mobile-health-product",
+    "category": "Mobile Health Product",
+    "risk_level": "Yellow",
+    "name": "Mobile Health Product Gate1 KB",
+    "description": "Synthetic Gate1 knowledge base for mobile healthcare applications."
+  }
+}

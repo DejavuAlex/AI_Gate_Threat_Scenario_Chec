@@ -55,3 +55,11 @@ JIRA_TIMEOUT_SECONDS = float(os.getenv("JIRA_TIMEOUT_SECONDS", "30"))
 # cannot see, making created issues invisible on dashboards. Set this to an
 # security level id the reporting account can view/set to override that default.
 JIRA_SECURITY_LEVEL_ID = os.getenv("JIRA_SECURITY_LEVEL_ID", "")
+JIRA_VERIFY_SSL = os.getenv("JIRA_VERIFY_SSL", "true").lower() in {"1", "true", "yes", "on"}
+JIRA_REQUEST_TIMEOUT = float(os.getenv("JIRA_REQUEST_TIMEOUT", str(JIRA_TIMEOUT_SECONDS)))
+JIRA_ATTACHMENT_TIMEOUT = float(os.getenv("JIRA_ATTACHMENT_TIMEOUT", "60"))
+JIRA_ATTACHMENT_MAX_BYTES = int(os.getenv("JIRA_ATTACHMENT_MAX_BYTES", str(20 * 1024 * 1024)))
+# Jira squeezes wide tables into unreadable columns, so tables with more columns
+# than this are transposed into one vertical field/value table per row. Set to 0
+# to always keep the original horizontal layout.
+JIRA_TABLE_TRANSPOSE_MIN_COLUMNS = int(os.getenv("JIRA_TABLE_TRANSPOSE_MIN_COLUMNS", "5"))

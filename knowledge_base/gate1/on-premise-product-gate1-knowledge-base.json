@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "e2e-1.0.0",
+  "gate": "Gate1",
+  "name": "On-Premise Product Gate1 KB",
+  "description": "Synthetic Gate1 knowledge base for localized and air-gapped enterprise products.",
+  "category": "On-Premise Product",
+  "risk_level": "Yellow",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No on-premise product threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.35,
+      "keyword_match": 0.25,
+      "business_context": 0.2,
+      "negative_evidence_adjustment": 0.1,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G1-ONPREM-001",
+      "name": "Local Administration Portal",
+      "problem_scenario": "Does the localized product expose an administration portal inside the customer network?",
+      "category": "On-Premise Administration",
+      "business_indicators": [
+        "本地管理控制台",
+        "内网管理门户",
+        "on-premises admin portal",
+        "air-gapped admin console"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "无管理控制台",
+        "cloud managed only",
+        "不提供本地管理入口"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "A weakly protected local administration portal may permit privilege escalation.",
+        "Shared administrator accounts may prevent accountability in customer environments."
+      ],
+      "security_control_requirements": [
+        "Require MFA and role-based authorization for every local administrator.",
+        "Restrict the administration portal to an explicit customer network allowlist.",
+        "Record immutable audit events for privileged configuration changes."
+      ]
+    },
+    {
+      "id": "G1-ONPREM-002",
+      "name": "Offline Update Package Import",
+      "problem_scenario": "Can administrators import an offline installation or upgrade package into an isolated deployment?",
+      "category": "On-Premise Supply Chain",
+      "business_indicators": [
+        "离线升级包",
+        "离线安装包导入",
+        "offline update package",
+        "removable media import"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "不支持离线升级",
+        "online updates only",
+        "禁止导入安装包"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 6,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "A tampered offline package may execute attacker-controlled code during installation.",
+        "Untrusted removable media may introduce malware into an isolated environment."
+      ],
+      "security_control_requirements": [
+        "Verify the vendor digital signature before importing an offline package.",
+        "Reject expired, downgraded, or replayed update packages.",
+        "Scan removable media and record the package checksum in the audit trail."
+      ]
+    },
+    {
+      "id": "G1-ONPREM-003",
+      "name": "Enterprise Directory Authentication",
+      "problem_scenario": "Does the product authenticate customer users through an enterprise directory?",
+      "category": "On-Premise Identity",
+      "business_indicators": [
+        "Active Directory integration",
+        "LDAP login",
+        "域账号登录",
+        "企业目录认证"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "不接入企业目录",
+        "local accounts only",
+        "no LDAP"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 5,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Insecure directory integration may expose credentials or allow unauthorized group mapping.",
+        "Stale directory memberships may retain access after a user changes roles."
+      ],
+      "security_control_requirements": [
+        "Use encrypted directory transport and validate the directory server certificate.",
+        "Map directory groups to least-privilege application roles.",
+        "Synchronize account disablement and audit every directory authentication decision."
+      ]
+    }
+  ],
+  "metadata": {
+    "knowledge_base_id": "on-premise-product",
+    "category": "On-Premise Product",
+    "risk_level": "Yellow",
+    "name": "On-Premise Product Gate1 KB",
+    "description": "Synthetic Gate1 knowledge base for localized and air-gapped enterprise products."
+  }
+}

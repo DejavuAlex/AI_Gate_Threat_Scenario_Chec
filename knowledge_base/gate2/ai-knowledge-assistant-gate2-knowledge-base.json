@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "e2e-1.0.0",
+  "gate": "Gate2",
+  "name": "AI Knowledge Assistant Gate2 KB",
+  "description": "Synthetic Gate2 knowledge base for retrieval-augmented AI assistants and tool-using agents.",
+  "category": "AI Product",
+  "risk_level": "Yellow",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No AI assistant design threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.3,
+      "technical_keyword_match": 0.25,
+      "architecture_context": 0.2,
+      "gate1_control_traceability": 0.15,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G2-AI-001",
+      "name": "Prompt Boundary Enforcement",
+      "mapped_gate1_scenario_id": "G1-AI-001",
+      "problem_scenario": "Does the design isolate untrusted prompts from system instructions, secrets, and tenant context?",
+      "category": "AI Prompt Security",
+      "business_indicators": [],
+      "technical_indicators": [
+        "instruction hierarchy",
+        "prompt injection detector",
+        "system prompt isolation",
+        "context redaction pipeline",
+        "LLM input policy"
+      ],
+      "negative_indicators": [
+        "prompt directly concatenated",
+        "system prompt exposed",
+        "关闭提示词过滤"
+      ],
+      "risk": {
+        "P1": 7,
+        "P2": 6,
+        "P": 4,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Direct prompt concatenation can blur trusted and untrusted instruction boundaries.",
+        "Unredacted context can leak credentials or cross-tenant data to a model provider."
+      ],
+      "security_control_requirements": [
+        "Separate system instructions, retrieved context, and user content in the model request.",
+        "Apply input and output policy checks before releasing a response.",
+        "Test prompt-exfiltration and cross-tenant injection cases."
+      ],
+      "verification_points": [
+        "Architecture shows explicit trusted and untrusted prompt boundaries.",
+        "The policy pipeline redacts secrets before model invocation.",
+        "Adversarial prompt tests run in CI."
+      ]
+    },
+    {
+      "id": "G2-AI-002",
+      "name": "Tenant-Isolated Retrieval Pipeline",
+      "mapped_gate1_scenario_id": "G1-AI-002",
+      "problem_scenario": "Does the vector retrieval implementation enforce provenance, authorization, and deletion?",
+      "category": "AI Retrieval Security",
+      "business_indicators": [],
+      "technical_indicators": [
+        "vector database tenant filter",
+        "chunk ACL metadata",
+        "embedding ingestion pipeline",
+        "retrieval citation",
+        "vector tombstone deletion"
+      ],
+      "negative_indicators": [
+        "shared unfiltered vector index",
+        "retrieval without tenant filter",
+        "共享向量库无租户过滤"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Missing metadata filters can retrieve another tenant's document chunks.",
+        "Incomplete deletion can retain regulated content in vectors or caches."
+      ],
+      "security_control_requirements": [
+        "Attach immutable tenant, document, and ACL metadata to every vector chunk.",
+        "Require authorized metadata filters in every retrieval query.",
+        "Delete source files, chunks, embeddings, and caches through one audited workflow."
+      ],
+      "verification_points": [
+        "The vector schema requires tenant and ACL metadata.",
+        "Retrieval APIs cannot omit the authorization filter.",
+        "Deletion acceptance tests cover vectors and caches."
+      ]
+    },
+    {
+      "id": "G2-AI-003",
+      "name": "Constrained Agent Tool Gateway",
+      "mapped_gate1_scenario_id": "G1-AI-003",
+      "problem_scenario": "Does a policy gateway authorize, validate, approve, and audit every model-requested tool call?",
+      "category": "AI Agent Security",
+      "business_indicators": [],
+      "technical_indicators": [
+        "tool allowlist gateway",
+        "JSON Schema tool arguments",
+        "human approval checkpoint",
+        "agent execution sandbox",
+        "scoped tool token"
+      ],
+      "negative_indicators": [
+        "arbitrary shell tool",
+        "auto approve tool call",
+        "任意工具自动执行"
+      ],
+      "risk": {
+        "P1": 7,
+        "P2": 6,
+        "P": 4,
+        "severity": 10,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "An unconstrained tool call can turn model manipulation into a real business impact.",
+        "Broad tool credentials can expand the blast radius of a single malicious request."
+      ],
+      "security_control_requirements": [
+        "Route all tool calls through an allowlist and policy authorization gateway.",
+        "Validate arguments against JSON Schema and bind scoped credentials to the user intent.",
+        "Pause high-impact calls for human approval and persist a tamper-evident audit record."
+      ],
+      "verification_points": [
+        "Unknown tools and malformed arguments fail closed.",
+        "High-impact tools cannot bypass human approval.",
+        "Audit records correlate prompt, user, approval, tool call, and result."
+      ]
+    }
+  ],
+  "metadata": {
+    "knowledge_base_id": "ai-knowledge-assistant",
+    "category": "AI Product",
+    "risk_level": "Yellow",
+    "name": "AI Knowledge Assistant Gate2 KB",
+    "description": "Synthetic Gate2 knowledge base for retrieval-augmented AI assistants and tool-using agents."
+  }
+}

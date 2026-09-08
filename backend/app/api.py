@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from . import config
 from .schemas import ApproveRequest, JiraSendRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
 from .services import jira as jira_service
+from .services import report_generator
 from .services.knowledge_base import KnowledgeBaseService
 from .services.review import ReviewService
 
@@ -254,6 +255,36 @@ def download_task_final_report(task_id: str):
     return Response(content=_task_final_report_markdown(task), media_type="text/markdown", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+@router.post("/tasks/{task_id}/final-report/jira")
+def send_task_final_report_to_jira(task_id: str, request: JiraSendRequest):
+    try:
+        task = review_service.get_task(task_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="task not found")
+    task_code = task.get("task_code") or task_id
+    attachment_name = f"{task_code}-Final-Review-Summary.md"
+    markdown = _task_final_report_markdown(task)
+    summary = request.summary or f"[AI Security Gate] Final review summary {task_code}"
+    labels = request.labels or ["ai-security-gate", "final-report"]
+    # Keep the issue description short; the full task summary rides along as an attachment.
+    description = markdown if request.full_report else report_generator.build_task_jira_summary(task, attachment_name)
+    try:
+        created = jira_service.create_issue(summary, description, labels)
+    except jira_service.JiraNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except jira_service.JiraError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    attachment_error = None
+    try:
+        jira_service.attach_bytes(created["issue_key"], markdown.encode("utf-8"), attachment_name)
+    except jira_service.JiraError as exc:
+        attachment_error = str(exc)
+    result = {"task_id": task_id, **created}
+    if attachment_error:
+        result["attachment_error"] = attachment_error
+    return result
+
+
 @router.get("/work-orders")
 def list_work_orders(product_name: str | None = Query(default=None), product_version: str | None = Query(default=None), task_id: str | None = Query(default=None)):
     return {"items": review_service.list_work_orders(product_name=product_name, product_version=product_version, task_id=task_id)}
@@ -303,23 +334,39 @@ def jira_settings():
 @router.post("/reports/{review_id}/jira")
 def send_report_to_jira(review_id: str, request: JiraSendRequest):
     try:
-        content = review_service.get_report_content(review_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="report not found")
-    try:
         review = review_service.get(review_id)
     except FileNotFoundError:
         review = {}
     gate = review.get("gate", "")
     summary = request.summary or f"[AI Security Gate] {gate or 'Review'} report {review_id}"
     labels = request.labels or ["ai-security-gate"] + ([gate] if gate else [])
+    # The issue description carries only the highlights; the full Markdown
+    # report is attached below so reviewers are not forced to scroll it in Jira.
+    if review and not request.full_report:
+        description = report_generator.build_jira_summary(review)
+    else:
+        try:
+            description = review_service.get_report_content(review_id)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="report not found")
     try:
-        created = jira_service.create_issue(summary, content, labels)
+        created = jira_service.create_issue(summary, description, labels)
     except jira_service.JiraNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except jira_service.JiraError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
-    return {"review_id": review_id, **created}
+    attachment_error = None
+    try:
+        report_path = review_service.get_report_path(review_id)
+        jira_service.attach_file(created["issue_key"], report_path, filename=f"{review_id}.md")
+    except FileNotFoundError:
+        attachment_error = "report file not found"
+    except jira_service.JiraError as exc:
+        attachment_error = str(exc)
+    result = {"review_id": review_id, **created}
+    if attachment_error:
+        result["attachment_error"] = attachment_error
+    return result
 
 
 @router.put("/reports/{review_id}")

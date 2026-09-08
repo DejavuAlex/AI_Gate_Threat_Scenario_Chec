@@ -42,6 +42,9 @@ class ReportUpdateRequest(BaseModel):
 class JiraSendRequest(BaseModel):
     summary: str | None = None
     labels: list[str] | None = None
+    # By default the issue description holds only the review highlights. Set this
+    # to send the entire Markdown report as the description instead.
+    full_report: bool = False
 
 
 class KnowledgeBaseUpdateRequest(BaseModel):

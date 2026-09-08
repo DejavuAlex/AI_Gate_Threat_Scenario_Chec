@@ -295,6 +295,205 @@ def _request_input_documents(request: Any) -> list[str]:
     return items or ["No input documents provided."]
 
 
+# Jira issue descriptions stay short on purpose: reviewers act on the scenarios
+# and controls, and the full report is always attached to the same issue.
+SUMMARY_MAX_SCENARIOS = 20
+SUMMARY_MAX_CONTROLS = 25
+SUMMARY_MAX_ACTION_ITEMS = 15
+_RISK_ORDER = {"red": 0, "yellow": 1, "green": 2}
+
+
+def _cell(value: Any) -> str:
+    """Make a value safe to place inside a Markdown table cell."""
+    text = str(value if value is not None else "").strip()
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def _highest_risk(scenarios: list[dict[str, Any]]) -> str:
+    levels = [str(item.get("risk_level") or "").strip() for item in scenarios]
+    levels = [level for level in levels if level]
+    if not levels:
+        return "None"
+    return sorted(levels, key=lambda level: _RISK_ORDER.get(level.lower(), 9))[0]
+
+
+def _summary_scenarios(review: dict[str, Any]) -> list[dict[str, Any]]:
+    """Matched scenarios with risk level and score, newest schema first."""
+    detailed = (review.get("match_result") or {}).get("matched_scenarios") or []
+    if detailed:
+        return [
+            {
+                "scenario_id": (item.get("scenario") or {}).get("id", ""),
+                "scenario_name": (item.get("scenario") or {}).get("name", ""),
+                "category": (item.get("scenario") or {}).get("category", ""),
+                "risk_level": ((item.get("scenario") or {}).get("risk") or {}).get("level", ""),
+                "final_score": item.get("final_score"),
+            }
+            for item in detailed
+        ]
+    return list(review.get("matched_scenarios") or [])
+
+
+def _summary_controls(review: dict[str, Any]) -> list[str]:
+    match_result = review.get("match_result") or {}
+    if match_result.get("matched_scenarios"):
+        return _final_controls(match_result)
+    return []
+
+
+def _verification_action_items(verification: dict[str, Any]) -> list[dict[str, Any]]:
+    """Gate1 controls that Gate2 could not confirm as fully covered."""
+    return [
+        item
+        for item in verification.get("items") or []
+        if str(item.get("result", "")).strip().lower() not in {"documented", "implemented"}
+    ]
+
+
+def build_jira_summary(review: dict[str, Any]) -> str:
+    """Condense a stored review into the highlights worth putting in a Jira issue."""
+    review_id = review.get("review_id", "")
+    gate = str(review.get("gate") or "review").strip()
+    request = review.get("request") or {}
+    scenarios = _summary_scenarios(review)
+    controls = _summary_controls(review)
+    matched = bool(review.get("matched"))
+
+    product = " / ".join(part for part in [review.get("product_name"), review.get("product_version")] if part)
+    task_label = " ".join(part for part in [review.get("task_code"), review.get("task_name")] if part)
+    kb_label = review.get("knowledge_base_id") or request.get("knowledge_base_id") or ""
+    kb_version = review.get("knowledge_base_version") or ""
+    if kb_version:
+        kb_label = f"{kb_label} ({kb_version})"
+    approval = (
+        f"{review.get('approval_status')} by {review.get('approved_by')} at {review.get('approved_at')}"
+        if review.get("approval_status") == "approved"
+        else review.get("approval_status") or "pending"
+    )
+    result_text = (
+        f"Matched {len(scenarios)} threat scenario(s)"
+        if matched
+        else (review.get("match_result") or {}).get("unmatched_message") or "No threat scenario matched"
+    )
+
+    lines = [f"# {gate.upper()} Security Review Summary", ""]
+    lines += ["| Field | Value |", "|---|---|"]
+    for label, value in [
+        ("Review ID", review_id),
+        ("Gate", gate),
+        ("Product / Version", product),
+        ("Task", task_label),
+        ("Knowledge Base", kb_label),
+        ("Threshold", request.get("threshold")),
+        ("Result", result_text),
+        ("Highest Risk", _highest_risk(scenarios)),
+        ("Approval", approval),
+        ("LLM Enhanced", "yes" if review.get("llm_enabled") else "no"),
+        ("Reviewed At", review.get("created_at")),
+    ]:
+        if value not in (None, ""):
+            lines.append(f"| {_cell(label)} | {_cell(value)} |")
+    lines.append("")
+
+    if scenarios:
+        lines += [f"## Matched Threat Scenarios ({len(scenarios)})", ""]
+        lines += ["| Scenario | Risk | Score |", "|---|---|---|"]
+        for item in scenarios[:SUMMARY_MAX_SCENARIOS]:
+            name = " ".join(part for part in [item.get("scenario_id"), item.get("scenario_name")] if part)
+            score = item.get("final_score")
+            lines.append(f"| {_cell(name)} | {_cell(item.get('risk_level'))} | {_cell(score)} |")
+        if len(scenarios) > SUMMARY_MAX_SCENARIOS:
+            lines.append(f"| ... {len(scenarios) - SUMMARY_MAX_SCENARIOS} more in the attached report | | |")
+        lines.append("")
+
+    if controls:
+        lines += [f"## Required Security Controls ({len(controls)})", ""]
+        lines += [f"{index}. {control}" for index, control in enumerate(controls[:SUMMARY_MAX_CONTROLS], start=1)]
+        if len(controls) > SUMMARY_MAX_CONTROLS:
+            lines.append(f"{SUMMARY_MAX_CONTROLS + 1}. ... {len(controls) - SUMMARY_MAX_CONTROLS} more in the attached report")
+        lines.append("")
+
+    verification = review.get("gate1_control_verification") or {}
+    if verification.get("baseline_available"):
+        lines += ["## Gate1 Control Verification", ""]
+        lines += ["| Result | Count |", "|---|---|"]
+        for label, key in [
+            ("Documented", "documented"),
+            ("Partial", "partial"),
+            ("No Evidence", "no_evidence"),
+            ("Implemented", "implemented"),
+            ("Not Implemented", "not_implemented"),
+        ]:
+            if key in verification:
+                lines.append(f"| {_cell(label)} | {_cell(verification.get(key))} |")
+        lines.append("")
+        pending = _verification_action_items(verification)
+        if pending:
+            lines += [f"### Controls Needing Action ({len(pending)})", ""]
+            for item in pending[:SUMMARY_MAX_ACTION_ITEMS]:
+                action = str(item.get("required_action") or "").strip()
+                suffix = f" — {action}" if action and action.lower() != "none." else ""
+                lines.append(f"- **{item.get('result', '')}**: {item.get('control', '')}{suffix}")
+            if len(pending) > SUMMARY_MAX_ACTION_ITEMS:
+                lines.append(f"- ... {len(pending) - SUMMARY_MAX_ACTION_ITEMS} more in the attached report")
+            lines.append("")
+
+    lines += ["---", "", f"Full report is attached to this issue as `{review_id}.md`."]
+    return "\n".join(lines)
+
+
+def build_task_jira_summary(task: dict[str, Any], attachment_name: str) -> str:
+    """Condense a task's end-to-end review outcome for a Jira issue description."""
+    approval = task.get("approval") or {}
+    auto_gate2 = task.get("auto_gate2") or {}
+    reports = task.get("reports") or {}
+
+    product = " / ".join(part for part in [task.get("product_name"), task.get("product_version")] if part)
+    repo = "/".join(part for part in [task.get("repository"), task.get("branch")] if part)
+
+    lines = ["# AI Gate Final Review Summary", ""]
+    lines += ["| Field | Value |", "|---|---|"]
+    for label, value in [
+        ("Task", " ".join(part for part in [task.get("task_code"), task.get("task_name")] if part)),
+        ("Product / Version", product),
+        ("Project", task.get("project_id")),
+        ("Repository / Branch", repo),
+        ("Flow Status", task.get("flow_status")),
+        ("Final Result", task.get("final_result")),
+        ("Auto Gate2 Status", auto_gate2.get("status")),
+        ("Triggered By", task.get("triggered_by")),
+        ("Created At", task.get("created_at")),
+        ("Updated At", task.get("updated_at")),
+    ]:
+        if value not in (None, ""):
+            lines.append(f"| {_cell(label)} | {_cell(value)} |")
+    lines.append("")
+
+    lines += ["## Approvals", "", "| Gate | Approved By | Approved At |", "|---|---|---|"]
+    for gate in ["gate1", "gate2"]:
+        item = approval.get(gate) or {}
+        lines.append(f"| {gate} | {_cell(item.get('approved_by') or 'pending')} | {_cell(item.get('approved_at') or '-')} |")
+    lines.append("")
+
+    lines += ["## Latest Reports", "", "| Gate | Review ID |", "|---|---|"]
+    has_report = False
+    for gate in ["gate1", "gate2"]:
+        items = reports.get(gate) or []
+        if items:
+            has_report = True
+            lines.append(f"| {gate} | {_cell(items[-1].get('review_id'))} |")
+    if not has_report:
+        lines.append("| - | - |")
+    lines.append("")
+
+    error = auto_gate2.get("error")
+    if error:
+        lines += ["## Auto Gate2 Error", "", f"> {_cell(error)}", ""]
+
+    lines += ["---", "", f"Full task summary is attached to this issue as `{attachment_name}`."]
+    return "\n".join(lines)
+
+
 def generate_gate1_report(review_id: str, work_order_id: str, request: Any, kb: dict[str, Any], match_result: dict[str, Any], task_meta: dict[str, Any] | None = None) -> str:
     model = risk_model_for(kb)
     lines = ["# Security Review Gate1 Report", ""]

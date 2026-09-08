@@ -41,3 +41,25 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://eu.aigw.galileo.roche.co
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_MATCHING_TEMPERATURE = float(os.getenv("LLM_MATCHING_TEMPERATURE", "0"))
 LLM_MATCHING_TIMEOUT_SECONDS = float(os.getenv("LLM_MATCHING_TIMEOUT_SECONDS", "60"))
+
+# Jira integration. The API token is a secret and must only come from the
+# environment or .env; it is never returned by the API or written to a report.
+JIRA_BASE_URL = os.getenv("JIRA_BASE_URL", "").rstrip("/")
+JIRA_PROJECT_KEY = os.getenv("JIRA_PROJECT_KEY", "")
+JIRA_EMAIL = os.getenv("JIRA_EMAIL", "")
+JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN", "")
+JIRA_ISSUE_TYPE = os.getenv("JIRA_ISSUE_TYPE", "Task")
+JIRA_TIMEOUT_SECONDS = float(os.getenv("JIRA_TIMEOUT_SECONDS", "30"))
+# Optional: some Jira projects apply a hidden default Issue Security Level to
+# new issues (via the project's security scheme) that the reporting account
+# cannot see, making created issues invisible on dashboards. Set this to an
+# security level id the reporting account can view/set to override that default.
+JIRA_SECURITY_LEVEL_ID = os.getenv("JIRA_SECURITY_LEVEL_ID", "")
+JIRA_VERIFY_SSL = os.getenv("JIRA_VERIFY_SSL", "true").lower() in {"1", "true", "yes", "on"}
+JIRA_REQUEST_TIMEOUT = float(os.getenv("JIRA_REQUEST_TIMEOUT", str(JIRA_TIMEOUT_SECONDS)))
+JIRA_ATTACHMENT_TIMEOUT = float(os.getenv("JIRA_ATTACHMENT_TIMEOUT", "60"))
+JIRA_ATTACHMENT_MAX_BYTES = int(os.getenv("JIRA_ATTACHMENT_MAX_BYTES", str(20 * 1024 * 1024)))
+# Jira squeezes wide tables into unreadable columns, so tables with more columns
+# than this are transposed into one vertical field/value table per row. Set to 0
+# to always keep the original horizontal layout.
+JIRA_TABLE_TRANSPOSE_MIN_COLUMNS = int(os.getenv("JIRA_TABLE_TRANSPOSE_MIN_COLUMNS", "5"))

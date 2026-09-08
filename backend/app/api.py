@@ -1,11 +1,14 @@
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from . import config
-from .schemas import ApproveRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
+from .schemas import ApproveRequest, JiraSendRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
+from .services import jira as jira_service
+from .services import report_generator
 from .services.knowledge_base import KnowledgeBaseService
 from .services.review import ReviewService
 
@@ -36,6 +39,7 @@ kb_service = KnowledgeBaseService()
 
 ALLOWED_SPEC_EXTENSIONS = {".md", ".markdown", ".txt", ".json", ".yaml", ".yml"}
 MAX_SPEC_FILE_SIZE = 10 * 1024 * 1024
+MAX_KB_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _safe_spec_filename(filename: str | None) -> str:
@@ -251,6 +255,36 @@ def download_task_final_report(task_id: str):
     return Response(content=_task_final_report_markdown(task), media_type="text/markdown", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+@router.post("/tasks/{task_id}/final-report/jira")
+def send_task_final_report_to_jira(task_id: str, request: JiraSendRequest):
+    try:
+        task = review_service.get_task(task_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="task not found")
+    task_code = task.get("task_code") or task_id
+    attachment_name = f"{task_code}-Final-Review-Summary.md"
+    markdown = _task_final_report_markdown(task)
+    summary = request.summary or f"[AI Security Gate] Final review summary {task_code}"
+    labels = request.labels or ["ai-security-gate", "final-report"]
+    # Keep the issue description short; the full task summary rides along as an attachment.
+    description = markdown if request.full_report else report_generator.build_task_jira_summary(task, attachment_name)
+    try:
+        created = jira_service.create_issue(summary, description, labels)
+    except jira_service.JiraNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except jira_service.JiraError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    attachment_error = None
+    try:
+        jira_service.attach_bytes(created["issue_key"], markdown.encode("utf-8"), attachment_name)
+    except jira_service.JiraError as exc:
+        attachment_error = str(exc)
+    result = {"task_id": task_id, **created}
+    if attachment_error:
+        result["attachment_error"] = attachment_error
+    return result
+
+
 @router.get("/work-orders")
 def list_work_orders(product_name: str | None = Query(default=None), product_version: str | None = Query(default=None), task_id: str | None = Query(default=None)):
     return {"items": review_service.list_work_orders(product_name=product_name, product_version=product_version, task_id=task_id)}
@@ -292,6 +326,49 @@ def download_report(review_id: str):
     return FileResponse(path=path, filename=path.name, media_type="text/markdown")
 
 
+@router.get("/integrations/jira")
+def jira_settings():
+    return jira_service.settings()
+
+
+@router.post("/reports/{review_id}/jira")
+def send_report_to_jira(review_id: str, request: JiraSendRequest):
+    try:
+        review = review_service.get(review_id)
+    except FileNotFoundError:
+        review = {}
+    gate = review.get("gate", "")
+    summary = request.summary or f"[AI Security Gate] {gate or 'Review'} report {review_id}"
+    labels = request.labels or ["ai-security-gate"] + ([gate] if gate else [])
+    # The issue description carries only the highlights; the full Markdown
+    # report is attached below so reviewers are not forced to scroll it in Jira.
+    if review and not request.full_report:
+        description = report_generator.build_jira_summary(review)
+    else:
+        try:
+            description = review_service.get_report_content(review_id)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="report not found")
+    try:
+        created = jira_service.create_issue(summary, description, labels)
+    except jira_service.JiraNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except jira_service.JiraError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    attachment_error = None
+    try:
+        report_path = review_service.get_report_path(review_id)
+        jira_service.attach_file(created["issue_key"], report_path, filename=f"{review_id}.md")
+    except FileNotFoundError:
+        attachment_error = "report file not found"
+    except jira_service.JiraError as exc:
+        attachment_error = str(exc)
+    result = {"review_id": review_id, **created}
+    if attachment_error:
+        result["attachment_error"] = attachment_error
+    return result
+
+
 @router.put("/reports/{review_id}")
 def update_report(review_id: str, request: ReportUpdateRequest):
     try:
@@ -301,35 +378,109 @@ def update_report(review_id: str, request: ReportUpdateRequest):
 
 
 @router.post("/reports/{review_id}/approve")
-def approve_report(review_id: str, request: ApproveRequest):
+def approve_report(review_id: str, request: ApproveRequest, background_tasks: BackgroundTasks):
     try:
-        return review_service.approve(review_id, request.reviewer, request.comment)
+        result = review_service.approve(review_id, request.reviewer, request.comment)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="review not found")
+    if result.get("auto_gate2_triggered"):
+        background_tasks.add_task(review_service.run_auto_gate2, review_id)
+    return result
 
 
 @router.post("/security-review/gate1/{review_id}/approve")
-def approve_gate1_report(review_id: str, request: ApproveRequest):
-    return approve_report(review_id, request)
+def approve_gate1_report(review_id: str, request: ApproveRequest, background_tasks: BackgroundTasks):
+    return approve_report(review_id, request, background_tasks)
 
 
 @router.post("/security-review/gate2/{review_id}/approve")
-def approve_gate2_report(review_id: str, request: ApproveRequest):
-    return approve_report(review_id, request)
+def approve_gate2_report(review_id: str, request: ApproveRequest, background_tasks: BackgroundTasks):
+    return approve_report(review_id, request, background_tasks)
+
+
+@router.get("/knowledge-base/{gate}/catalog")
+def get_knowledge_base_catalog(gate: str):
+    try:
+        return {"items": kb_service.list_catalog(gate)}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/knowledge-base/{gate}/upload")
+async def upload_knowledge_base(
+    gate: str,
+    file: UploadFile = File(...),
+    knowledge_base_id: str = Form(...),
+    updated_by: str = Form("security.admin@example.com"),
+    change_reason: str = Form("Uploaded from UI"),
+    version: str | None = Form(default=None),
+    name: str | None = Form(default=None),
+    category: str | None = Form(default=None),
+    risk_level: str | None = Form(default=None),
+    description: str | None = Form(default=None),
+):
+    total = 0
+    chunks = []
+    try:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_KB_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="knowledge base file is too large")
+            chunks.append(chunk)
+        try:
+            content = json.loads(b"".join(chunks).decode("utf-8"))
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail="knowledge base file must be UTF-8 JSON") from exc
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"invalid knowledge base JSON: {exc.msg}") from exc
+        if not isinstance(content, dict):
+            raise HTTPException(status_code=400, detail="knowledge base JSON must be an object")
+        saved = kb_service.save_uploaded_update(
+            gate,
+            content,
+            knowledge_base_id,
+            updated_by,
+            change_reason,
+            version=version,
+            name=name,
+            category=category,
+            risk_level=risk_level,
+            description=description,
+        )
+        catalog = kb_service.list_catalog(gate)
+        item = next((entry for entry in catalog if entry.get("knowledge_base_id") == saved.get("metadata", {}).get("knowledge_base_id")), None)
+        return {"item": item, "content": saved}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        await file.close()
 
 
 @router.get("/knowledge-base/{gate}")
-def get_knowledge_base(gate: str):
+def get_knowledge_base(gate: str, knowledge_base_id: str = Query(default="default")):
     try:
-        return kb_service.load(gate)
+        return kb_service.load(gate, knowledge_base_id)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/knowledge-base/{gate}/history")
-def get_knowledge_base_history(gate: str):
+def get_knowledge_base_history(gate: str, knowledge_base_id: str | None = Query(default=None)):
     try:
-        return {"items": kb_service.list_history(gate)}
+        return {"items": kb_service.list_history(gate, knowledge_base_id)}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/knowledge-base/{gate}/history/{history_id}")
+def get_knowledge_base_history_detail(gate: str, history_id: str):
+    try:
+        return kb_service.get_history(gate, history_id)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -337,6 +488,6 @@ def get_knowledge_base_history(gate: str):
 @router.put("/knowledge-base/{gate}")
 def update_knowledge_base(gate: str, request: KnowledgeBaseUpdateRequest):
     try:
-        return kb_service.save_manual_update(gate, request.content, request.updated_by, request.change_reason, request.version)
+        return kb_service.save_manual_update(gate, request.content, request.updated_by, request.change_reason, request.version, request.knowledge_base_id)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))

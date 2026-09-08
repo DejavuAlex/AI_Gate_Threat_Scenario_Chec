@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "sample-1.0.0",
+  "gate": "Gate1",
+  "name": "Cloud Service Sample Gate1 KB",
+  "description": "Sample Gate1 cloud service golden knowledge base",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No cloud service threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.35,
+      "keyword_match": 0.25,
+      "business_context": 0.2,
+      "negative_evidence_adjustment": 0.1,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G1-CLOUD-SAMPLE-001",
+      "name": "Cloud Object Storage Upload",
+      "problem_scenario": "Does the business requirement allow users or systems to upload files to cloud object storage?",
+      "category": "Cloud Service",
+      "business_indicators": [
+        "cloud storage",
+        "object storage",
+        "bucket",
+        "file upload",
+        "S3",
+        "OSS",
+        "Blob Storage",
+        "上传到云存储",
+        "对象存储"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "no upload",
+        "local only",
+        "不上传文件",
+        "仅本地处理"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Untrusted files may be uploaded to cloud object storage and later served to users.",
+        "Public bucket or weak object ACLs may expose sensitive files."
+      ],
+      "security_control_requirements": [
+        "Validate file type and file content before upload.",
+        "Store uploaded objects in private buckets by default.",
+        "Use signed URLs with short expiration for downloads.",
+        "Enable malware scanning before files become available."
+      ]
+    },
+    {
+      "id": "G1-CLOUD-SAMPLE-002",
+      "name": "Cloud API Access Token Usage",
+      "problem_scenario": "Does the business flow call cloud APIs using access tokens, API keys, or service credentials?",
+      "category": "Cloud Service",
+      "business_indicators": [
+        "cloud API",
+        "access token",
+        "API key",
+        "service credential",
+        "云端接口",
+        "访问令牌"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "no external cloud API",
+        "不调用云接口"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Leaked cloud API credentials may allow unauthorized resource access.",
+        "Over-privileged service credentials may increase blast radius."
+      ],
+      "security_control_requirements": [
+        "Store credentials in a managed secret store.",
+        "Use least-privilege IAM roles or scopes.",
+        "Rotate credentials and audit all cloud API calls."
+      ]
+    }
+  ],
+  "category": "Cloud Service",
+  "risk_level": "Yellow",
+  "metadata": {
+    "knowledge_base_id": "cloud-service-sample",
+    "category": "Cloud Service",
+    "risk_level": "Yellow",
+    "uploaded_at": "2026-08-03T02:06:52.618503+00:00",
+    "name": "Cloud Service Sample Gate1 KB",
+    "description": "Sample Gate1 cloud service golden knowledge base"
+  },
+  "audit": {
+    "last_updated_by": "security.admin@example.com",
+    "last_change_reason": "Upload cloud service sample Gate1 KB",
+    "last_updated_at": "2026-08-03T02:06:52.618655+00:00",
+    "last_history_id": "kb-change-gate1-cloud-service-sample-sample-1.0.0-cb52e1b2"
+  }
+}

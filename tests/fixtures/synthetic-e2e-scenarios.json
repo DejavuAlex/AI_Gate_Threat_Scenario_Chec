@@ -1,0 +1,117 @@
+{
+  "threshold": 0.78,
+  "negative_gate1_documents": [
+    "specs/e2e/negative-control/product-requirements.md"
+  ],
+  "negative_gate2_documents": [
+    "specs/e2e/negative-control/architecture.md"
+  ],
+  "scenarios": [
+    {
+      "slug": "cloud-saas",
+      "product_name": "Synthetic Cloud Collaboration SaaS",
+      "knowledge_base_id": "cloud-service-sample",
+      "gate1_documents": [
+        "specs/e2e/cloud-saas/product-requirements.md",
+        "specs/e2e/cloud-saas/user-stories.md",
+        "specs/e2e/cloud-saas/business-flow.md"
+      ],
+      "gate2_documents": [
+        "specs/e2e/cloud-saas/architecture.md",
+        "specs/e2e/cloud-saas/api-design.md",
+        "specs/e2e/cloud-saas/data-model.md",
+        "specs/e2e/cloud-saas/implementation-plan.md"
+      ],
+      "expected_gate1_scenarios": [
+        "G1-CLOUD-SAMPLE-001",
+        "G1-CLOUD-SAMPLE-002"
+      ],
+      "expected_gate2_scenarios": [
+        "G2-CLOUD-SAMPLE-001",
+        "G2-CLOUD-SAMPLE-002"
+      ],
+      "expected_gate1_control_count": 7
+    },
+    {
+      "slug": "on-premise",
+      "product_name": "Synthetic Localized Laboratory Platform",
+      "knowledge_base_id": "on-premise-product",
+      "gate1_documents": [
+        "specs/e2e/on-premise/product-requirements.md",
+        "specs/e2e/on-premise/user-stories.md",
+        "specs/e2e/on-premise/business-flow.md"
+      ],
+      "gate2_documents": [
+        "specs/e2e/on-premise/architecture.md",
+        "specs/e2e/on-premise/api-design.md",
+        "specs/e2e/on-premise/data-model.md",
+        "specs/e2e/on-premise/implementation-plan.md"
+      ],
+      "expected_gate1_scenarios": [
+        "G1-ONPREM-001",
+        "G1-ONPREM-002",
+        "G1-ONPREM-003"
+      ],
+      "expected_gate2_scenarios": [
+        "G2-ONPREM-001",
+        "G2-ONPREM-002",
+        "G2-ONPREM-003"
+      ],
+      "expected_gate1_control_count": 9
+    },
+    {
+      "slug": "mobile-health",
+      "product_name": "Synthetic Mobile Clinical Companion",
+      "knowledge_base_id": "mobile-health-product",
+      "gate1_documents": [
+        "specs/e2e/mobile-health/product-requirements.md",
+        "specs/e2e/mobile-health/user-stories.md",
+        "specs/e2e/mobile-health/business-flow.md"
+      ],
+      "gate2_documents": [
+        "specs/e2e/mobile-health/architecture.md",
+        "specs/e2e/mobile-health/api-design.md",
+        "specs/e2e/mobile-health/data-model.md",
+        "specs/e2e/mobile-health/implementation-plan.md"
+      ],
+      "expected_gate1_scenarios": [
+        "G1-MOBILE-001",
+        "G1-MOBILE-002",
+        "G1-MOBILE-003"
+      ],
+      "expected_gate2_scenarios": [
+        "G2-MOBILE-001",
+        "G2-MOBILE-002",
+        "G2-MOBILE-003"
+      ],
+      "expected_gate1_control_count": 9
+    },
+    {
+      "slug": "ai-knowledge-assistant",
+      "product_name": "Synthetic Enterprise AI Knowledge Assistant",
+      "knowledge_base_id": "ai-knowledge-assistant",
+      "gate1_documents": [
+        "specs/e2e/ai-knowledge-assistant/product-requirements.md",
+        "specs/e2e/ai-knowledge-assistant/user-stories.md",
+        "specs/e2e/ai-knowledge-assistant/business-flow.md"
+      ],
+      "gate2_documents": [
+        "specs/e2e/ai-knowledge-assistant/architecture.md",
+        "specs/e2e/ai-knowledge-assistant/api-design.md",
+        "specs/e2e/ai-knowledge-assistant/data-model.md",
+        "specs/e2e/ai-knowledge-assistant/implementation-plan.md"
+      ],
+      "expected_gate1_scenarios": [
+        "G1-AI-001",
+        "G1-AI-002",
+        "G1-AI-003"
+      ],
+      "expected_gate2_scenarios": [
+        "G2-AI-001",
+        "G2-AI-002",
+        "G2-AI-003"
+      ],
+      "expected_gate1_control_count": 9
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 import json
+import logging
 import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -20,6 +22,9 @@ from .knowledge_base import KnowledgeBaseService
 from .llm_matching import LLMMatchingService
 from .matching import MatchingEngine
 from .report_generator import generate_gate1_report, generate_gate2_report
+
+
+logger = logging.getLogger(__name__)
 
 
 def _slug(value: str | None, fallback: str = "unknown") -> str:
@@ -55,6 +60,7 @@ class ReviewService:
     def __init__(self):
         self.kb_service = KnowledgeBaseService()
         self.llm_matching = LLMMatchingService()
+        self._workflow_lock = threading.RLock()
 
     def _next_task_serial(self) -> int:
         TASK_SEQUENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -119,6 +125,8 @@ class ReviewService:
             "approval": {},
             "auto_gate2": {"enabled": request.auto_run_gate2_on_gate1_approval, "status": "not_started"},
             "gate2_documents": request.gate2_documents or DEFAULT_GATE2_DOCUMENTS,
+            "gate2_document_texts": [item.model_dump() for item in request.gate2_document_texts],
+            "gate2_knowledge_base_id": request.gate2_knowledge_base_id,
         }
         path = self._task_path_by_meta(request.product_name, request.product_version, task_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -242,13 +250,17 @@ class ReviewService:
         return report_path if report_path.exists() else None
 
     def _run_match(self, gate: str, request: ReviewRunRequest) -> tuple[dict, list[dict], str, dict]:
-        kb = self.kb_service.load(gate)
-        document_text, docs = read_documents(request.documents)
+        kb = self.kb_service.load(gate, request.knowledge_base_id)
+        document_text, docs = read_documents(request.documents, request.document_texts)
         stories = extract_stories(docs)
         matcher = MatchingEngine(kb, request.threshold)
         match_result = matcher.match(document_text, gate)
         match_result = self.llm_matching.enhance_matches(gate, document_text, docs, kb, match_result, request.threshold)
-        match_result["story_assessments"] = matcher.assess_stories(stories, gate)
+        match_result["story_assessments"] = matcher.assess_stories(
+            stories,
+            gate,
+            overall_matches=match_result.get("matched_scenarios", []),
+        )
         return kb, docs, document_text, match_result
 
     def run_local_agent(self, gate: str, request: ReviewRunRequest) -> dict:
@@ -300,6 +312,8 @@ class ReviewService:
             "gate1_control_verification": verification,
             "llm_enabled": match_result.get("llm_enabled", False),
             "llm_error": match_result.get("llm_error"),
+            "knowledge_base_id": request.knowledge_base_id,
+            "knowledge_base_version": kb.get("knowledge_base_version"),
             "created_at": now.isoformat(),
             "request": request.model_dump(),
             "documents": docs,
@@ -372,6 +386,8 @@ class ReviewService:
             "approved_at": None,
             "llm_enabled": match_result.get("llm_enabled", False),
             "llm_error": match_result.get("llm_error"),
+            "knowledge_base_id": request.knowledge_base_id,
+            "knowledge_base_version": kb.get("knowledge_base_version"),
             "gate1_control_verification": verification,
             "created_at": now.isoformat(),
             "request": request.model_dump(),
@@ -382,61 +398,223 @@ class ReviewService:
         self._store_review(review_id, response)
         return response
 
+    def _auto_gate2_request(self, review: dict, task: dict) -> ReviewRunRequest:
+        request = review.get("request", {})
+        return ReviewRunRequest(
+            project_id=review.get("project_id") or request.get("project_id", "demo"),
+            product_name=review["product_name"],
+            product_version=review["product_version"],
+            task_id=review["task_id"],
+            task_name=review.get("task_name"),
+            repository=request.get("repository"),
+            branch=request.get("branch"),
+            documents=request.get("gate2_documents") or task.get("gate2_documents") or DEFAULT_GATE2_DOCUMENTS,
+            document_texts=request.get("gate2_document_texts") or task.get("gate2_document_texts") or [],
+            knowledge_base_id=request.get("gate2_knowledge_base_id") or task.get("gate2_knowledge_base_id") or "default",
+            threshold=request.get("threshold", 0.78),
+            triggered_by="auto-after-gate1-approval",
+            gate1_report=review.get("report_path"),
+            auto_run_gate2_on_gate1_approval=False,
+        )
+
     def approve(self, review_id: str, reviewer: str, comment: str | None = None) -> dict:
-        review = self._load_review(review_id)
-        now = datetime.now(timezone.utc).isoformat()
-        review["approval_status"] = "approved"
-        review["approved_by"] = reviewer
-        review["approved_at"] = now
-        review.setdefault("audit", []).append({"action": "approve", "reviewer": reviewer, "comment": comment, "at": now})
-        self._store_review(review_id, review)
+        with self._workflow_lock:
+            review = self._load_review(review_id)
+            now = datetime.now(timezone.utc).isoformat()
+            review["approval_status"] = "approved"
+            review["approved_by"] = reviewer
+            review["approved_at"] = now
+            review.setdefault("audit", []).append({"action": "approve", "reviewer": reviewer, "comment": comment, "at": now})
+            self._store_review(review_id, review)
 
-        result = {"approved_review": review, "auto_gate2_triggered": False, "auto_gate2_result": None}
-        task = self._load_task(review.get("task_id"))
-        if not task:
-            return result
-        task.setdefault("approval", {})[review["gate"]] = {"review_id": review_id, "approved_by": reviewer, "approved_at": now, "comment": comment}
+            result = {
+                "approved_review": review,
+                "auto_gate2_triggered": False,
+                "auto_gate2_status": None,
+                "auto_gate2_result": None,
+            }
+            task = self._load_task(review.get("task_id"))
+            if not task:
+                return result
+            task.setdefault("approval", {})[review["gate"]] = {
+                "review_id": review_id,
+                "approved_by": reviewer,
+                "approved_at": now,
+                "comment": comment,
+            }
 
-        if review.get("gate") == "gate1":
-            if not review.get("matched"):
-                task["flow_status"] = "completed_no_security_risk"
-                task["status"] = "completed"
-                task["final_result"] = "no_security_risk"
-                task["auto_gate2"] = {"enabled": False, "status": "skipped_no_security_risk"}
-            else:
-                task["flow_status"] = "gate1_approved_gate2_required"
-                task["final_result"] = "gate1_risk_found_gate2_required"
-                auto_enabled = review.get("request", {}).get("auto_run_gate2_on_gate1_approval", True)
-                if auto_enabled:
-                    task["auto_gate2"] = {"enabled": True, "status": "running", "triggered_by_gate1_review_id": review_id, "triggered_at": now}
-                    self._store_task(task)
-                    gate2_request = ReviewRunRequest(
-                        project_id=review.get("project_id") or review.get("request", {}).get("project_id", "demo"),
-                        product_name=review["product_name"],
-                        product_version=review["product_version"],
-                        task_id=review["task_id"],
-                        task_name=review.get("task_name"),
-                        repository=review.get("request", {}).get("repository"),
-                        branch=review.get("request", {}).get("branch"),
-                        documents=review.get("request", {}).get("gate2_documents") or task.get("gate2_documents") or DEFAULT_GATE2_DOCUMENTS,
-                        threshold=review.get("request", {}).get("threshold", 0.78),
-                        triggered_by="auto-after-gate1-approval",
-                        gate1_report=review.get("report_path"),
-                        auto_run_gate2_on_gate1_approval=False,
-                    )
-                    gate2_result = self.run("gate2", gate2_request)
-                    result["auto_gate2_triggered"] = True
-                    result["auto_gate2_result"] = gate2_result
-                    task = self._load_task(review["task_id"]) or task
-                    task["auto_gate2"] = {"enabled": True, "status": "completed", "triggered_by_gate1_review_id": review_id, "gate2_review_id": gate2_result["review_id"], "completed_at": datetime.now(timezone.utc).isoformat()}
+            if review.get("gate") == "gate1":
+                if not review.get("matched"):
+                    task["flow_status"] = "completed_no_security_risk"
+                    task["status"] = "completed"
+                    task["final_result"] = "no_security_risk"
+                    task["auto_gate2"] = {"enabled": False, "status": "skipped_no_security_risk"}
+                    result["auto_gate2_status"] = "skipped_no_security_risk"
                 else:
-                    task["auto_gate2"] = {"enabled": False, "status": "manual_gate2_required"}
-        elif review.get("gate") == "gate2":
-            task["flow_status"] = "completed_gate2_approved"
+                    task["flow_status"] = "gate1_approved_gate2_required"
+                    task["status"] = "in_progress"
+                    task["final_result"] = "gate1_risk_found_gate2_required"
+                    auto_enabled = review.get("request", {}).get("auto_run_gate2_on_gate1_approval", True)
+                    auto_gate2 = task.get("auto_gate2", {}) or {}
+                    latest_gate2_review_id = task.get("latest_gate2_review_id")
+                    if latest_gate2_review_id:
+                        task["auto_gate2"] = {
+                            **auto_gate2,
+                            "enabled": True,
+                            "status": "completed",
+                            "triggered_by_gate1_review_id": review_id,
+                            "gate2_review_id": latest_gate2_review_id,
+                            "completed_at": auto_gate2.get("completed_at") or now,
+                        }
+                        result["auto_gate2_status"] = "completed"
+                    elif auto_enabled and auto_gate2.get("status") in {"queued", "running"}:
+                        result["auto_gate2_status"] = auto_gate2.get("status")
+                    elif auto_enabled:
+                        task["auto_gate2"] = {
+                            "enabled": True,
+                            "status": "queued",
+                            "triggered_by_gate1_review_id": review_id,
+                            "triggered_at": now,
+                            "queued_at": now,
+                            "attempt": int(auto_gate2.get("attempt", 0)) + 1,
+                        }
+                        result["auto_gate2_triggered"] = True
+                        result["auto_gate2_status"] = "queued"
+                    else:
+                        task["auto_gate2"] = {"enabled": False, "status": "manual_gate2_required"}
+                        result["auto_gate2_status"] = "manual_gate2_required"
+            elif review.get("gate") == "gate2":
+                task["flow_status"] = "completed_gate2_approved"
+                task["status"] = "completed"
+                task["final_result"] = "gate2_approved"
+            self._store_task(task)
+            return result
+
+    def run_auto_gate2(self, gate1_review_id: str) -> dict:
+        """Run one queued automatic Gate2 job and persist every terminal state."""
+        try:
+            with self._workflow_lock:
+                review = self._load_review(gate1_review_id)
+                if review.get("gate") != "gate1":
+                    raise ValueError(f"{gate1_review_id} is not a Gate1 review")
+                task = self._load_task(review.get("task_id"))
+                if not task:
+                    raise FileNotFoundError(review.get("task_id"))
+
+                auto_gate2 = task.get("auto_gate2", {}) or {}
+                latest_gate2_review_id = task.get("latest_gate2_review_id")
+                if latest_gate2_review_id:
+                    completed_at = datetime.now(timezone.utc).isoformat()
+                    task["auto_gate2"] = {
+                        **auto_gate2,
+                        "enabled": True,
+                        "status": "completed",
+                        "gate2_review_id": latest_gate2_review_id,
+                        "completed_at": auto_gate2.get("completed_at") or completed_at,
+                    }
+                    self._store_task(task)
+                    return {"status": "completed", "gate2_review_id": latest_gate2_review_id, "already_completed": True}
+                if auto_gate2.get("status") != "queued":
+                    return {"status": auto_gate2.get("status", "not_started"), "started": False}
+
+                started_at = datetime.now(timezone.utc).isoformat()
+                task["auto_gate2"] = {
+                    **auto_gate2,
+                    "enabled": True,
+                    "status": "running",
+                    "started_at": started_at,
+                }
+                task["flow_status"] = "gate2_running"
+                self._store_task(task)
+                gate2_request = self._auto_gate2_request(review, task)
+
+            gate2_result = self.run("gate2", gate2_request)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"[:2000]
+            logger.exception("Automatic Gate2 failed for Gate1 review %s", gate1_review_id)
+            task_id = locals().get("review", {}).get("task_id")
+            if task_id:
+                with self._workflow_lock:
+                    failed_task = self._load_task(task_id)
+                    if failed_task:
+                        failed_at = datetime.now(timezone.utc).isoformat()
+                        failed_task["auto_gate2"] = {
+                            **(failed_task.get("auto_gate2", {}) or {}),
+                            "enabled": True,
+                            "status": "failed",
+                            "error": error,
+                            "failed_at": failed_at,
+                        }
+                        failed_task["flow_status"] = "gate2_failed"
+                        failed_task["status"] = "in_progress"
+                        failed_task["final_result"] = "gate2_failed"
+                        self._store_task(failed_task)
+            return {"status": "failed", "error": error}
+
+        with self._workflow_lock:
+            task = self._load_task(review["task_id"]) or task
+            completed_at = datetime.now(timezone.utc).isoformat()
+            auto_gate2 = {
+                **(task.get("auto_gate2", {}) or {}),
+                "enabled": True,
+                "status": "completed",
+                "triggered_by_gate1_review_id": gate1_review_id,
+                "gate2_review_id": gate2_result["review_id"],
+                "completed_at": completed_at,
+            }
+            auto_gate2.pop("error", None)
+            auto_gate2.pop("failed_at", None)
+            task["auto_gate2"] = auto_gate2
+            task["flow_status"] = "gate2_completed"
             task["status"] = "completed"
-            task["final_result"] = "gate2_approved"
-        self._store_task(task)
-        return result
+            task["final_result"] = "gate2_completed"
+            self._store_task(task)
+        return {"status": "completed", "gate2_review_id": gate2_result["review_id"], "result": gate2_result}
+
+    def recover_interrupted_auto_gate2(self) -> list[str]:
+        """Requeue jobs persisted as active before the current process started."""
+        review_ids = []
+        with self._workflow_lock:
+            for path in TASKS_DIR.glob("**/*.json"):
+                task = _read_json(path)
+                if not task:
+                    continue
+                auto_gate2 = task.get("auto_gate2", {}) or {}
+                if auto_gate2.get("status") not in {"queued", "running"}:
+                    continue
+                now = datetime.now(timezone.utc).isoformat()
+                latest_gate2_review_id = task.get("latest_gate2_review_id")
+                if latest_gate2_review_id:
+                    task["auto_gate2"] = {
+                        **auto_gate2,
+                        "status": "completed",
+                        "gate2_review_id": latest_gate2_review_id,
+                        "completed_at": auto_gate2.get("completed_at") or now,
+                    }
+                    self._store_task(task)
+                    continue
+                gate1_review_id = auto_gate2.get("triggered_by_gate1_review_id")
+                if gate1_review_id and self._review_path(gate1_review_id).exists():
+                    task["auto_gate2"] = {
+                        **auto_gate2,
+                        "status": "queued",
+                        "recovered_at": now,
+                        "interrupted_status": auto_gate2.get("status"),
+                    }
+                    task["flow_status"] = "gate1_approved_gate2_required"
+                    self._store_task(task)
+                    review_ids.append(gate1_review_id)
+                else:
+                    task["auto_gate2"] = {
+                        **auto_gate2,
+                        "status": "failed",
+                        "error": "Automatic Gate2 could not be recovered because its Gate1 review is missing.",
+                        "failed_at": now,
+                    }
+                    task["flow_status"] = "gate2_failed"
+                    task["final_result"] = "gate2_failed"
+                    self._store_task(task)
+        return review_ids
 
     def list_tasks(self, product_name: str | None = None, product_version: str | None = None) -> list[dict]:
         items = []

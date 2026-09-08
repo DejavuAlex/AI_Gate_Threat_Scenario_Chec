@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "e2e-1.0.0",
+  "gate": "Gate2",
+  "name": "On-Premise Product Gate2 KB",
+  "description": "Synthetic Gate2 knowledge base for localized and air-gapped enterprise products.",
+  "category": "On-Premise Product",
+  "risk_level": "Yellow",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No on-premise product design threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.3,
+      "technical_keyword_match": 0.25,
+      "architecture_context": 0.2,
+      "gate1_control_traceability": 0.15,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G2-ONPREM-001",
+      "name": "Local Administration Network Controls",
+      "mapped_gate1_scenario_id": "G1-ONPREM-001",
+      "problem_scenario": "Does the design isolate and strongly authenticate the local administration endpoint?",
+      "category": "On-Premise Administration",
+      "business_indicators": [],
+      "technical_indicators": [
+        "management VLAN",
+        "mTLS reverse proxy",
+        "administrator RBAC",
+        "network allowlist",
+        "堡垒机访问"
+      ],
+      "negative_indicators": [
+        "public admin endpoint",
+        "no admin authentication",
+        "管理端口公开"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "An exposed administration endpoint increases the likelihood of privileged compromise.",
+        "Weak transport protection may expose administrative sessions inside the customer network."
+      ],
+      "security_control_requirements": [
+        "Place administration endpoints on a dedicated management network.",
+        "Enforce phishing-resistant MFA and fine-grained administrator RBAC.",
+        "Send privileged audit events to customer-controlled immutable storage."
+      ],
+      "verification_points": [
+        "Architecture identifies the management network boundary.",
+        "API design documents administrator authentication and authorization.",
+        "Implementation plan includes immutable privileged audit logging."
+      ]
+    },
+    {
+      "id": "G2-ONPREM-002",
+      "name": "Offline Package Trust Verification",
+      "mapped_gate1_scenario_id": "G1-ONPREM-002",
+      "problem_scenario": "Does the installer verify integrity, authenticity, version, and provenance of offline packages?",
+      "category": "On-Premise Supply Chain",
+      "business_indicators": [],
+      "technical_indicators": [
+        "detached package signature",
+        "offline trust store",
+        "package checksum",
+        "anti-rollback counter",
+        "SBOM manifest"
+      ],
+      "negative_indicators": [
+        "skip signature verification",
+        "unsigned package accepted",
+        "允许未签名安装包"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 6,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Unsigned or replayed packages can compromise the localized deployment supply chain.",
+        "A missing rollback barrier may reintroduce known vulnerabilities."
+      ],
+      "security_control_requirements": [
+        "Verify a detached package signature against a pinned offline trust store.",
+        "Enforce monotonic version checks and an anti-rollback counter.",
+        "Validate the package checksum and bundled SBOM before installation."
+      ],
+      "verification_points": [
+        "Package verification failure is fail closed.",
+        "Rollback attempts are rejected and audited.",
+        "The package checksum and SBOM are retained as evidence."
+      ]
+    },
+    {
+      "id": "G2-ONPREM-003",
+      "name": "Secure Directory Federation",
+      "mapped_gate1_scenario_id": "G1-ONPREM-003",
+      "problem_scenario": "Does the implementation securely connect to and authorize identities from the customer directory?",
+      "category": "On-Premise Identity",
+      "business_indicators": [],
+      "technical_indicators": [
+        "LDAPS certificate validation",
+        "directory group mapping",
+        "LDAP bind account",
+        "nested group resolution",
+        "directory synchronization"
+      ],
+      "negative_indicators": [
+        "plain LDAP bind",
+        "disable certificate validation",
+        "明文LDAP"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 5,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Unvalidated directory TLS can leak credentials to a man-in-the-middle attacker.",
+        "Overbroad group mapping can grant unintended application privileges."
+      ],
+      "security_control_requirements": [
+        "Require LDAPS certificate validation for every directory connection.",
+        "Use a read-only least-privilege directory bind account.",
+        "Test group removal and disabled-account synchronization."
+      ],
+      "verification_points": [
+        "LDAPS trust anchors and hostname verification are documented.",
+        "The bind account permissions are read only.",
+        "Acceptance tests cover group removal and account disablement."
+      ]
+    }
+  ],
+  "metadata": {
+    "knowledge_base_id": "on-premise-product",
+    "category": "On-Premise Product",
+    "risk_level": "Yellow",
+    "name": "On-Premise Product Gate2 KB",
+    "description": "Synthetic Gate2 knowledge base for localized and air-gapped enterprise products."
+  }
+}

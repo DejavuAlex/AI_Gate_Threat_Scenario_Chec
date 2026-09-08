@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "e2e-1.0.0",
+  "gate": "Gate2",
+  "name": "Mobile Health Product Gate2 KB",
+  "description": "Synthetic Gate2 knowledge base for mobile healthcare applications.",
+  "category": "Mobile Health Product",
+  "risk_level": "Yellow",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No mobile health design threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.3,
+      "technical_keyword_match": 0.25,
+      "architecture_context": 0.2,
+      "gate1_control_traceability": 0.15,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G2-MOBILE-001",
+      "name": "Verified Mobile Link Routing",
+      "mapped_gate1_scenario_id": "G1-MOBILE-001",
+      "problem_scenario": "Does the implementation verify mobile links and authorize every routed clinical object?",
+      "category": "Mobile Navigation",
+      "business_indicators": [],
+      "technical_indicators": [
+        "apple-app-site-association",
+        "assetlinks.json",
+        "intent filter autoVerify",
+        "universal link router",
+        "deep-link route allowlist"
+      ],
+      "negative_indicators": [
+        "unverified custom scheme",
+        "wildcard deep-link route",
+        "任意URL Scheme"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 5,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Missing domain association allows link hijacking by another application.",
+        "Route parameters may cause unauthorized direct object access."
+      ],
+      "security_control_requirements": [
+        "Verify iOS and Android domain-association files during release testing.",
+        "Use a route allowlist and reject unknown parameters.",
+        "Perform server-side object authorization after link routing."
+      ],
+      "verification_points": [
+        "Domain-association files are part of release acceptance tests.",
+        "The router has explicit route and parameter allowlists.",
+        "Every clinical object is authorized by the backend."
+      ]
+    },
+    {
+      "id": "G2-MOBILE-002",
+      "name": "Protected Offline Mobile Storage",
+      "mapped_gate1_scenario_id": "G1-MOBILE-002",
+      "problem_scenario": "Does the mobile storage design protect cached clinical data throughout its lifecycle?",
+      "category": "Mobile Data Protection",
+      "business_indicators": [],
+      "technical_indicators": [
+        "Android Keystore",
+        "iOS Keychain",
+        "encrypted SQLite",
+        "backup exclusion flag",
+        "screen capture protection"
+      ],
+      "negative_indicators": [
+        "plaintext SQLite",
+        "unencrypted preferences",
+        "明文缓存"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 6,
+        "P": 3,
+        "severity": 10,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Plaintext or backup-eligible mobile storage may disclose clinical records.",
+        "Key material not bound to the device may be extracted with copied data."
+      ],
+      "security_control_requirements": [
+        "Wrap database keys with Android Keystore or iOS Keychain protection.",
+        "Exclude clinical data from operating-system and cloud backups.",
+        "Test secure purge and screenshot protection on supported devices."
+      ],
+      "verification_points": [
+        "The data model identifies encrypted and non-persistent fields.",
+        "Backup exclusion is set for every clinical cache file.",
+        "Logout acceptance tests verify secure purge."
+      ]
+    },
+    {
+      "id": "G2-MOBILE-003",
+      "name": "Platform Biometric Enforcement",
+      "mapped_gate1_scenario_id": "G1-MOBILE-003",
+      "problem_scenario": "Does the application enforce strong platform biometrics and safe fallback behavior?",
+      "category": "Mobile Authentication",
+      "business_indicators": [],
+      "technical_indicators": [
+        "BiometricPrompt BIOMETRIC_STRONG",
+        "LocalAuthentication policy",
+        "biometric key invalidation",
+        "server step-up token",
+        "biometric fallback policy"
+      ],
+      "negative_indicators": [
+        "application biometric template",
+        "weak device credential fallback",
+        "存储生物特征模板"
+      ],
+      "risk": {
+        "P1": 5,
+        "P2": 5,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Weak fallback settings can reduce biometric authentication to a low-assurance device credential.",
+        "Failure to invalidate keys after biometric enrollment changes may retain stale access."
+      ],
+      "security_control_requirements": [
+        "Require BIOMETRIC_STRONG or the equivalent iOS owner-authentication policy.",
+        "Invalidate protected keys when biometric enrollment changes.",
+        "Use a short-lived server step-up token for high-risk actions."
+      ],
+      "verification_points": [
+        "Supported platform policies are documented by operating-system version.",
+        "Enrollment-change tests invalidate protected keys.",
+        "High-risk APIs require a valid server step-up token."
+      ]
+    }
+  ],
+  "metadata": {
+    "knowledge_base_id": "mobile-health-product",
+    "category": "Mobile Health Product",
+    "risk_level": "Yellow",
+    "name": "Mobile Health Product Gate2 KB",
+    "description": "Synthetic Gate2 knowledge base for mobile healthcare applications."
+  }
+}

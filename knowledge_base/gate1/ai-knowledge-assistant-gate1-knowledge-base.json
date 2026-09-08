@@ -1,0 +1,135 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "e2e-1.0.0",
+  "gate": "Gate1",
+  "name": "AI Knowledge Assistant Gate1 KB",
+  "description": "Synthetic Gate1 knowledge base for retrieval-augmented AI assistants and tool-using agents.",
+  "category": "AI Product",
+  "risk_level": "Yellow",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No AI assistant threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.35,
+      "keyword_match": 0.25,
+      "business_context": 0.2,
+      "negative_evidence_adjustment": 0.1,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G1-AI-001",
+      "name": "Untrusted User Prompt",
+      "problem_scenario": "Can a user submit free-form instructions or content to an AI assistant?",
+      "category": "AI Prompt Security",
+      "business_indicators": [
+        "user-provided prompt",
+        "free-form AI instruction",
+        "用户输入提示词",
+        "AI对话输入"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "no user prompt",
+        "不接受用户提示词",
+        "fixed responses only"
+      ],
+      "risk": {
+        "P1": 7,
+        "P2": 6,
+        "P": 4,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "A malicious prompt may override intended behavior or exfiltrate protected context.",
+        "Prompt content may include secrets or regulated data that must not enter logs."
+      ],
+      "security_control_requirements": [
+        "Treat every user prompt as untrusted data rather than an instruction to the platform.",
+        "Detect and block attempts to extract system prompts, secrets, or cross-tenant context.",
+        "Redact sensitive prompt content from application and model-provider logs."
+      ]
+    },
+    {
+      "id": "G1-AI-002",
+      "name": "External Document RAG Ingestion",
+      "problem_scenario": "Can users upload or connect documents that become retrieval context for the AI assistant?",
+      "category": "AI Retrieval Security",
+      "business_indicators": [
+        "RAG document ingestion",
+        "vector knowledge base",
+        "upload documents for AI search",
+        "上传文档到向量知识库",
+        "检索增强生成"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "no external documents",
+        "不接收外部知识文档",
+        "curated corpus only"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 9,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "A poisoned document may manipulate retrieval results or inject hidden model instructions.",
+        "Missing tenant filters may disclose chunks from another customer corpus."
+      ],
+      "security_control_requirements": [
+        "Scan and classify every document before adding it to the retrieval index.",
+        "Enforce tenant and access-control filters during both ingestion and retrieval.",
+        "Return source citations and support removal of every indexed document and chunk."
+      ]
+    },
+    {
+      "id": "G1-AI-003",
+      "name": "Agent Tool Execution",
+      "problem_scenario": "Can model output cause an external tool or business action to execute?",
+      "category": "AI Agent Security",
+      "business_indicators": [
+        "AI agent tool execution",
+        "model-triggered action",
+        "agent invokes business API",
+        "AI代理调用工具",
+        "模型触发业务操作"
+      ],
+      "technical_indicators": [],
+      "negative_indicators": [
+        "read-only assistant",
+        "不调用任何工具",
+        "no external action"
+      ],
+      "risk": {
+        "P1": 7,
+        "P2": 6,
+        "P": 4,
+        "severity": 10,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Prompt injection may cause the agent to invoke a tool outside the user's intent.",
+        "Autonomous high-impact actions may execute without adequate human authorization."
+      ],
+      "security_control_requirements": [
+        "Allow only explicitly registered tools with least-privilege scoped credentials.",
+        "Require human confirmation before every irreversible or high-impact action.",
+        "Validate tool arguments and record the prompt, decision, approver, and result."
+      ]
+    }
+  ],
+  "metadata": {
+    "knowledge_base_id": "ai-knowledge-assistant",
+    "category": "AI Product",
+    "risk_level": "Yellow",
+    "name": "AI Knowledge Assistant Gate1 KB",
+    "description": "Synthetic Gate1 knowledge base for retrieval-augmented AI assistants and tool-using agents."
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0.0",
+  "knowledge_base_version": "sample-1.0.0",
+  "gate": "Gate2",
+  "name": "Cloud Service Sample Gate2 KB",
+  "description": "Sample Gate2 cloud service golden knowledge base",
+  "llm_editable": false,
+  "matching_policy": {
+    "default_threshold": 0.78,
+    "strict_no_forced_match": true,
+    "unmatched_message": "No cloud service design threat scenario matched.",
+    "score_formula": {
+      "semantic_similarity": 0.3,
+      "technical_keyword_match": 0.25,
+      "architecture_context": 0.2,
+      "gate1_control_traceability": 0.15,
+      "llm_confidence": 0.1
+    }
+  },
+  "scenarios": [
+    {
+      "id": "G2-CLOUD-SAMPLE-001",
+      "name": "Cloud Object Storage Implementation Controls",
+      "mapped_gate1_scenario_id": "G1-CLOUD-SAMPLE-001",
+      "problem_scenario": "Does the architecture implement upload, storage, and download through cloud object storage?",
+      "category": "Cloud Service",
+      "business_indicators": [],
+      "technical_indicators": [
+        "S3",
+        "OSS",
+        "Blob Storage",
+        "bucket",
+        "object ACL",
+        "signed URL",
+        "presigned URL",
+        "multipart upload",
+        "对象存储",
+        "签名URL"
+      ],
+      "negative_indicators": [
+        "local filesystem only",
+        "no object storage",
+        "不使用对象存储"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Objects may be exposed through public bucket policy or weak ACL configuration.",
+        "Uploaded malicious content may be distributed through signed download links."
+      ],
+      "security_control_requirements": [
+        "Enforce private bucket policy and block public access.",
+        "Generate short-lived signed URLs server-side only.",
+        "Validate object metadata, MIME type, and file magic number.",
+        "Scan uploaded objects before releasing download links."
+      ],
+      "verification_points": [
+        "Architecture documents private bucket policy.",
+        "API design defines signed URL expiration.",
+        "Implementation plan includes malware scanning and type validation."
+      ]
+    },
+    {
+      "id": "G2-CLOUD-SAMPLE-002",
+      "name": "Cloud IAM Least Privilege",
+      "mapped_gate1_scenario_id": "G1-CLOUD-SAMPLE-002",
+      "problem_scenario": "Does the design use cloud IAM roles, API keys, or service principals for cloud resource access?",
+      "category": "Cloud Service",
+      "business_indicators": [],
+      "technical_indicators": [
+        "IAM role",
+        "service principal",
+        "access key",
+        "secret key",
+        "KMS",
+        "Vault",
+        "STS",
+        "云账号",
+        "服务凭证"
+      ],
+      "negative_indicators": [
+        "no cloud credential",
+        "不使用云凭证"
+      ],
+      "risk": {
+        "P1": 6,
+        "P2": 6,
+        "P": 3,
+        "severity": 8,
+        "level": "Yellow"
+      },
+      "risk_identification": [
+        "Over-privileged cloud identity may allow unauthorized resource modification.",
+        "Static keys may be leaked through logs, CI/CD variables, or configuration files."
+      ],
+      "security_control_requirements": [
+        "Use least-privilege IAM roles with scoped permissions.",
+        "Prefer short-lived credentials over static keys.",
+        "Store secrets in a managed secret store and never in repository files.",
+        "Enable audit logging for cloud API usage."
+      ],
+      "verification_points": [
+        "IAM permissions are documented per resource.",
+        "No static cloud keys are stored in config files.",
+        "Audit logging and credential rotation are included in the implementation plan."
+      ]
+    }
+  ],
+  "category": "Cloud Service",
+  "risk_level": "Yellow",
+  "metadata": {
+    "knowledge_base_id": "cloud-service-sample",
+    "category": "Cloud Service",
+    "risk_level": "Yellow",
+    "uploaded_at": "2026-08-03T02:07:01.182301+00:00",
+    "name": "Cloud Service Sample Gate2 KB",
+    "description": "Sample Gate2 cloud service golden knowledge base"
+  },
+  "audit": {
+    "last_updated_by": "security.admin@example.com",
+    "last_change_reason": "Upload cloud service sample Gate2 KB",
+    "last_updated_at": "2026-08-03T02:07:01.182535+00:00",
+    "last_history_id": "kb-change-gate2-cloud-service-sample-sample-1.0.0-566f76ab"
+  }
+}

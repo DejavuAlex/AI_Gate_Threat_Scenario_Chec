@@ -5,145 +5,565 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI Security Gate</title>
   <style>
-    :root { --bg:#0f172a; --side:#020617; --card:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; --line:#334155; }
+    :root {
+      --bg:#0b1120; --side:#070d1a; --card:#141d2f; --surface:#0d1526; --field:#0a1120;
+      --text:#e6edf7; --muted:#8fa1ba; --accent:#38bdf8; --accent-soft:rgba(56,189,248,.14);
+      --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; --line:#22314a; --line-soft:#1a2740;
+      --shadow:0 12px 34px rgba(2,6,20,.40); --radius:14px; --side-width:264px;
+    }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
-    .app { display:grid; grid-template-columns:260px 1fr; min-height:100vh; }
-    aside { background:var(--side); border-right:1px solid var(--line); padding:18px 12px; }
-    .brand { padding:8px 10px 16px; border-bottom:1px solid var(--line); margin-bottom:14px; }
-    .brand h1 { margin:0; font-size:20px; }
-    .brand p { color:var(--muted); font-size:12px; line-height:1.45; }
-    .nav button { display:block; width:100%; text-align:left; margin:6px 0; padding:11px 12px; border-radius:10px; border:1px solid transparent; background:transparent; color:var(--text); font-weight:800; cursor:pointer; }
-    .nav button.active,.nav button:hover { border-color:#2563eb; background:#0b1220; color:#bfdbfe; }
-    main { padding:22px; overflow:auto; }
-    .topbar { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:18px; }
-    h2 { margin:0; } h3 { margin:0 0 12px; }
+    html { min-width:320px; }
+    body {
+      margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--bg); color:var(--text); font-size:14px; line-height:1.55;
+      min-width:320px; overflow-x:hidden; -webkit-font-smoothing:antialiased;
+      background-image:radial-gradient(900px 500px at 78% -10%, rgba(56,189,248,.10), transparent 60%), radial-gradient(700px 420px at 8% 4%, rgba(99,102,241,.10), transparent 55%);
+      background-attachment:fixed;
+    }
+    ::-webkit-scrollbar { width:10px; height:10px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#25344e; border-radius:999px; border:2px solid transparent; background-clip:padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background:#334565; }
+    .app { display:grid; grid-template-columns:var(--side-width) minmax(0,1fr); min-height:100vh; }
+    aside {
+      position:sticky; top:0; align-self:start; width:var(--side-width); height:100vh; overflow-y:auto;
+      background:linear-gradient(180deg,#080f1e,#060b16); border-right:1px solid var(--line-soft); padding:20px 14px;
+    }
+    .brand { padding:6px 10px 18px; border-bottom:1px solid var(--line-soft); margin-bottom:16px; }
+    .brandRow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .brand h1 { margin:0 0 6px; font-size:19px; letter-spacing:.3px; background:linear-gradient(90deg,#e6edf7,#7dd3fc); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .brandRow h1 { margin-bottom:0; }
+    .brandRow + p { margin-top:6px; }
+    .brand p { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .nav button {
+      position:relative; display:block; width:100%; text-align:left; margin:4px 0; padding:11px 12px 11px 14px;
+      border-radius:10px; border:1px solid transparent; background:transparent; color:#c3d0e2; box-shadow:none;
+      font-weight:600; font-size:13.5px; cursor:pointer; transition:background .18s ease,color .18s ease,border-color .18s ease;
+    }
+    .nav button::before { content:""; position:absolute; left:0; top:50%; transform:translateY(-50%); width:3px; height:0; border-radius:999px; background:var(--accent); transition:height .18s ease; }
+    .nav button:hover { background:rgba(148,163,184,.07); color:#e2eaf6; filter:none; box-shadow:none; }
+    .nav button:active { transform:none; }
+    .nav button.active { background:var(--accent-soft); border-color:rgba(56,189,248,.30); color:#bae6fd; font-weight:700; box-shadow:none; }
+    .nav button.active::before { height:18px; }
+    .navScrim { display:none; }
+    main { min-width:0; width:100%; padding:24px 26px 32px; overflow:auto; }
+    .topbar { display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px 20px; align-items:center; margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--line-soft); }
+    .topbarTitle { display:flex; min-width:0; align-items:center; gap:11px; }
+    .topbarTitle > div { min-width:0; }
+    .topbarSubtitle { margin:2px 0 0; color:var(--muted); font-size:12px; }
+    .topbarActions { justify-content:flex-end; margin-left:auto; }
+    .topbar button { margin-top:0; }
+    .iconButton {
+      width:40px; height:40px; min-width:40px; margin:0; padding:0; display:inline-flex; align-items:center; justify-content:center;
+      color:#c9d7e9; background:#172238; border:1px solid #2b3b56; box-shadow:none;
+    }
+    .iconButton:hover { background:#22304a; filter:none; box-shadow:none; }
+    .menuToggle,.navClose { display:none; }
+    .menuBars { display:grid; gap:4px; width:18px; }
+    .menuBars span { display:block; height:2px; border-radius:999px; background:currentColor; }
+    h2 { margin:0; font-size:21px; letter-spacing:.2px; }
+    h3 { margin:0 0 14px; font-size:15px; letter-spacing:.2px; color:#dce6f5; }
     .muted { color:var(--muted); }
     .small { font-size:12px; }
-    .tab { display:none; } .tab.active { display:block; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
-    .grid4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 8px 20px rgba(0,0,0,.18); }
-    label { display:block; color:var(--muted); margin:10px 0 6px; font-size:13px; }
-    input, textarea, select { width:100%; background:#0b1220; color:var(--text); border:1px solid #475569; border-radius:8px; padding:10px; }
-    textarea { min-height:96px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
-    button { cursor:pointer; background:var(--accent); color:#001018; border:0; padding:10px 14px; border-radius:9px; font-weight:800; margin-top:10px; }
-    button.secondary { background:#334155; color:var(--text); }
-    button.ok { background:var(--ok); color:#03210d; }
-    button.warn { background:var(--warn); color:#261300; }
-    button.inline { margin:0 4px 4px 0; padding:7px 9px; font-size:12px; }
-    pre { background:#020617; color:#d1d5db; border:1px solid var(--line); border-radius:10px; padding:12px; white-space:pre-wrap; overflow:auto; max-height:520px; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-    .metric { background:#0b1220; border:1px solid var(--line); border-radius:12px; padding:14px; }
-    .metric .num { font-size:28px; font-weight:900; color:#bfdbfe; }
-    .metric .label { font-size:12px; color:var(--muted); }
-    .badge { display:inline-block; padding:4px 9px; border-radius:999px; background:#334155; font-size:12px; }
-    .badge.ok { background:#14532d; color:#bbf7d0; } .badge.warn { background:#78350f; color:#fde68a; } .badge.danger { background:#7f1d1d; color:#fecaca; }
-    a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    th,td { border-bottom:1px solid var(--line); padding:9px; text-align:left; vertical-align:top; }
-    th { color:var(--muted); background:#0b1220; position:sticky; top:0; z-index:1; }
-    .tableWrap { overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:10px; margin-top:12px; }
-    .note { border-left:4px solid var(--accent); background:#0b1220; padding:10px 12px; border-radius:8px; margin-bottom:14px; }
-    @media(max-width:900px){.app{grid-template-columns:1fr}.three,.two{grid-template-columns:1fr}}
+    .tab { display:none; } .tab.active { display:block; animation:fadeIn .22s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr)); gap:18px; }
+    .grid4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr)); gap:14px; }
+    .card {
+      min-width:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,0)), var(--card);
+      border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);
+      transition:border-color .2s ease, box-shadow .2s ease;
+    }
+    .card:hover { border-color:#2b3d5c; box-shadow:0 14px 36px rgba(2,6,20,.55); }
+    label { display:block; color:var(--muted); margin:12px 0 6px; font-size:12.5px; font-weight:600; letter-spacing:.2px; }
+    input, textarea, select {
+      width:100%; background:var(--field); color:var(--text); border:1px solid #2b3b56; border-radius:9px; padding:10px 11px;
+      font-size:13.5px; font-family:inherit; transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    input:hover, textarea:hover, select:hover { border-color:#3a4d6d; }
+    input:focus, textarea:focus, select:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,189,248,.16); background:#0c1424; }
+    input::placeholder, textarea::placeholder { color:#5d6f88; }
+    input:disabled, textarea:disabled, select:disabled { background:#0a101c; color:#6b7c93; cursor:not-allowed; }
+    input[type=file] { padding:7px 10px; color:var(--muted); font-size:12.5px; }
+    .row input[type=file] { width:auto; flex:1 1 280px; }
+    .row button { margin-top:0; }
+    input[type=file]::file-selector-button { margin:0 10px 0 0; padding:6px 12px; border:1px solid #31425e; border-radius:7px; background:#25334b; color:#d5deec; font:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:background .16s ease; }
+    input[type=file]::file-selector-button:hover { background:#2d3d59; }
+    textarea { min-height:96px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.6; resize:vertical; }
+    select { appearance:none; background-image:linear-gradient(45deg,transparent 50%,#7d8fa8 50%),linear-gradient(135deg,#7d8fa8 50%,transparent 50%); background-position:calc(100% - 17px) 51%,calc(100% - 12px) 51%; background-size:5px 5px,5px 5px; background-repeat:no-repeat; padding-right:32px; }
+    button {
+      cursor:pointer; background:linear-gradient(180deg,#4cc8fb,#22a7e8); color:#00131f; border:0; padding:9px 15px; border-radius:9px;
+      font-weight:700; font-size:13px; font-family:inherit; margin-top:10px; letter-spacing:.2px;
+      transition:transform .12s ease, filter .16s ease, box-shadow .16s ease, background .16s ease;
+      box-shadow:0 2px 10px rgba(34,167,232,.22);
+    }
+    button:hover { filter:brightness(1.08); box-shadow:0 4px 16px rgba(34,167,232,.32); }
+    button:active { transform:translateY(1px); }
+    button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    button.secondary { background:#25334b; color:#d5deec; box-shadow:none; border:1px solid #31425e; }
+    button.secondary:hover { background:#2d3d59; }
+    button.ok { background:linear-gradient(180deg,#37d16b,#1fae52); color:#02240e; box-shadow:0 2px 10px rgba(34,197,94,.22); }
+    button.warn { background:linear-gradient(180deg,#fbbf3f,#e79b0c); color:#241200; box-shadow:0 2px 10px rgba(245,158,11,.22); }
+    button.inline { min-height:34px; margin:0; padding:7px 10px; font-size:12px; white-space:nowrap; }
+    .sourceControl { margin-top:14px; padding:12px 13px; background:var(--surface); border:1px solid var(--line-soft); border-radius:11px; }
+    .sourceControl label { margin-top:0; }
+    .sourceControl .sourcePanel label { color:#8497b1; }
+    .sourceHeader { justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+    .sourceHeader label { margin-bottom:0; color:#c6d3e5; font-size:13px; font-weight:700; }
+    .segmented { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); flex:0 1 330px; width:min(100%,330px); min-width:0; gap:0; background:#0a1120; border:1px solid #2b3b56; border-radius:9px; padding:3px; }
+    .segmented button { min-width:0; margin:0; padding:6px 9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:transparent; color:#9fb0c7; border:0; border-radius:7px; font-size:12px; font-weight:600; box-shadow:none; }
+    .segmented button:hover { background:rgba(148,163,184,.10); color:#dbe5f2; filter:none; box-shadow:none; }
+    .segmented button.active { background:var(--accent); color:#00131f; font-weight:700; box-shadow:0 1px 6px rgba(56,189,248,.30); }
+    .sourcePanel.disabled { opacity:.42; }
+    .sourcePanel.disabled textarea { cursor:not-allowed; }
+    pre { max-width:100%; background:#060c18; color:#c9d6e6; border:1px solid var(--line-soft); border-radius:11px; padding:13px 14px; white-space:pre-wrap; overflow:auto; overflow-wrap:anywhere; max-height:520px; font-size:12.5px; line-height:1.6; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; margin:14px 0 0; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; color:#9fd8f5; background:rgba(56,189,248,.10); padding:1px 6px; border-radius:5px; }
+    .row { display:flex; min-width:0; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row > * { min-width:0; }
+    .two { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; }
+    .three { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:12px; }
+    .two > *,.three > * { min-width:0; }
+    .actionBar { position:sticky; top:0; z-index:5; margin-top:14px; padding:10px; border:1px solid var(--line-soft); border-radius:11px; background:rgba(10,17,32,.92); backdrop-filter:blur(6px); }
+    .statusStrip {
+      display:none; align-items:flex-start; gap:10px; margin-top:12px; padding:11px 13px;
+      border:1px solid var(--line); border-left-width:3px; border-radius:10px; background:var(--surface); font-size:13px;
+    }
+    .statusStrip.visible { display:flex; }
+    .statusStrip .statusIcon { flex:0 0 auto; font-size:14px; line-height:1.5; }
+    .statusStrip .statusBody { min-width:0; flex:1 1 auto; overflow-wrap:anywhere; }
+    .statusStrip .statusBody strong { display:block; color:#dce6f5; }
+    .statusStrip .statusBody span { color:var(--muted); font-size:12.5px; }
+    .statusStrip.info { border-left-color:var(--accent); }
+    .statusStrip.ok { border-left-color:var(--ok); }
+    .statusStrip.warn { border-left-color:var(--warn); }
+    .statusStrip.error { border-left-color:var(--danger); }
+    .statusStrip.error .statusBody strong { color:#fca5a5; }
+    .toastHost {
+      position:fixed; top:18px; right:18px; z-index:120; display:grid; gap:10px; width:min(380px,calc(100vw - 36px));
+      pointer-events:none;
+    }
+    .toast {
+      display:flex; gap:11px; align-items:flex-start; pointer-events:auto; padding:12px 13px;
+      border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:11px;
+      background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0)), var(--card);
+      box-shadow:0 16px 38px rgba(2,6,20,.55); animation:toastIn .22s ease;
+    }
+    .toast.ok { border-left-color:var(--ok); }
+    .toast.warn { border-left-color:var(--warn); }
+    .toast.error { border-left-color:var(--danger); }
+    .toast.closing { animation:toastOut .18s ease forwards; }
+    .toastIcon { flex:0 0 auto; font-size:14px; line-height:1.5; }
+    .toastBody { min-width:0; flex:1 1 auto; }
+    .toastTitle { color:#e6edf7; font-size:13px; font-weight:700; }
+    .toastText { margin-top:2px; color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
+    .toastText a { font-weight:600; }
+    .toastClose {
+      flex:0 0 auto; width:24px; height:24px; min-width:24px; margin:0; padding:0; display:inline-flex;
+      align-items:center; justify-content:center; border:0; border-radius:7px; background:transparent;
+      color:var(--muted); font-size:15px; font-weight:700; box-shadow:none;
+    }
+    .toastClose:hover { background:rgba(148,163,184,.12); color:#dce6f5; filter:none; box-shadow:none; }
+    @keyframes toastIn { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:none; } }
+    @keyframes toastOut { to { opacity:0; transform:translateX(14px); } }
+    .filterChips { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 4px; }
+    .chip {
+      display:inline-flex; align-items:center; gap:7px; margin:0; padding:7px 12px; cursor:pointer;
+      border:1px solid var(--line); border-radius:999px; background:var(--surface); color:#b8c7dc;
+      font-size:12.5px; font-weight:600; box-shadow:none;
+    }
+    .chip:hover { background:#16223a; color:#dce6f5; filter:none; box-shadow:none; }
+    .chip .chipCount { padding:1px 7px; border-radius:999px; background:#1d2a41; color:#cbd8e9; font-size:11.5px; font-weight:700; }
+    .chip .chipDot { width:8px; height:8px; border-radius:50%; background:#4a5c78; }
+    .chip.active { border-color:rgba(56,189,248,.42); background:var(--accent-soft); color:#bae6fd; }
+    .chip[data-state=running] .chipDot { background:var(--accent); }
+    .chip[data-state=approval] .chipDot { background:var(--warn); }
+    .chip[data-state=done] .chipDot { background:var(--ok); }
+    .chip[data-state=failed] .chipDot { background:var(--danger); }
+    .chip.readonly { cursor:default; }
+    .chip.readonly:hover { background:var(--surface); color:#b8c7dc; }
+    .taskCards { display:grid; gap:12px; margin-top:14px; }
+    .taskCard {
+      min-width:0; padding:14px 15px; border:1px solid var(--line); border-left:3px solid #33496d; border-radius:12px;
+      background:var(--surface); transition:border-color .18s ease, background .18s ease;
+    }
+    .taskCard:hover { background:#101a2d; border-color:#33496d; }
+    .taskCard[data-state=running] { border-left-color:var(--accent); }
+    .taskCard[data-state=approval] { border-left-color:var(--warn); }
+    .taskCard[data-state=done] { border-left-color:var(--ok); }
+    .taskCard[data-state=failed] { border-left-color:var(--danger); }
+    .taskCardTop { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:10px 14px; }
+    .taskCardTitle { min-width:0; flex:1 1 320px; }
+    .taskCardTitle .taskName { display:block; overflow:hidden; color:#e6edf7; font-size:14.5px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .taskCardTitle .taskMeta { display:block; margin-top:3px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+    .stageFlow { display:flex; flex-wrap:wrap; gap:4px 0; margin:14px 0 2px; }
+    .stage { display:flex; min-width:0; flex:1 1 110px; align-items:center; gap:8px; }
+    .stage .stageDot {
+      display:grid; flex:0 0 auto; place-items:center; width:22px; height:22px; border-radius:50%;
+      border:1px solid var(--line); background:#101a2d; color:#7488a4; font-size:11px; font-weight:800;
+    }
+    .stage .stageLabel { min-width:0; overflow:hidden; color:var(--muted); font-size:11.5px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+    .stage .stageBar { flex:1 1 12px; height:2px; min-width:10px; margin:0 4px; border-radius:999px; background:#22314a; }
+    .stage:last-child .stageBar { display:none; }
+    .stage[data-state=done] .stageDot { border-color:rgba(34,197,94,.42); background:rgba(34,197,94,.15); color:#86efac; }
+    .stage[data-state=done] .stageLabel { color:#9fbfae; }
+    .stage[data-state=done] .stageBar { background:rgba(34,197,94,.36); }
+    .stage[data-state=active] .stageDot { border-color:var(--accent); background:var(--accent-soft); color:#bae6fd; box-shadow:0 0 0 3px rgba(56,189,248,.13); }
+    .stage[data-state=active] .stageLabel { color:#bae6fd; }
+    .stage[data-state=failed] .stageDot { border-color:rgba(239,68,68,.45); background:rgba(239,68,68,.15); color:#fca5a5; }
+    .stage[data-state=failed] .stageLabel { color:#fca5a5; }
+    .stage[data-state=skipped] .stageDot { border-style:dashed; }
+    .taskCardFoot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; padding-top:11px; border-top:1px solid var(--line-soft); }
+    .taskCardLinks { display:flex; min-width:0; flex-wrap:wrap; align-items:center; gap:6px 12px; color:var(--muted); font-size:12px; }
+    .taskCardLinks .sep { color:#33496d; }
+    .taskCard.justCreated { border-color:rgba(56,189,248,.75); box-shadow:0 0 0 2px rgba(56,189,248,.25); animation:cardPulse 1.2s ease-in-out 2; }
+    @keyframes cardPulse { 0%,100% { box-shadow:0 0 0 2px rgba(56,189,248,.25); } 50% { box-shadow:0 0 0 7px rgba(56,189,248,0); } }
+    .taskCardError { margin-top:9px; padding:8px 10px; border:1px solid rgba(239,68,68,.28); border-radius:9px; background:rgba(239,68,68,.08); color:#fca5a5; font-size:12px; overflow-wrap:anywhere; }
+    .emptyState { padding:26px 16px; border:1px dashed var(--line); border-radius:12px; color:var(--muted); font-size:13px; text-align:center; }
+    @media(max-width:640px) {
+      .stage { flex:1 1 100%; }
+      .stage .stageBar { display:none; }
+      .stage .stageLabel { white-space:normal; }
+    }
+    .metric {
+      background:linear-gradient(160deg,rgba(56,189,248,.10),rgba(56,189,248,0) 60%), var(--surface);
+      border:1px solid var(--line); border-radius:12px; padding:16px;
+      transition:transform .18s ease, border-color .18s ease;
+    }
+    .metric:hover { transform:translateY(-2px); border-color:#33496d; }
+    .metric .num { font-size:29px; font-weight:800; color:#a8dcfb; line-height:1.2; letter-spacing:.5px; }
+    .metric .label { font-size:12px; color:var(--muted); margin-top:2px; letter-spacing:.3px; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:999px; background:#24334b; color:#c2cfe2; font-size:11.5px; font-weight:600; border:1px solid #2f4160; white-space:nowrap; line-height:1.6; }
+    .badge.ok { background:rgba(34,197,94,.14); color:#86efac; border-color:rgba(34,197,94,.32); }
+    .badge.warn { background:rgba(245,158,11,.14); color:#fcd34d; border-color:rgba(245,158,11,.32); }
+    .badge.danger { background:rgba(239,68,68,.14); color:#fca5a5; border-color:rgba(239,68,68,.32); }
+    .errorText { color:#fca5a5; display:inline-block; max-width:220px; overflow-wrap:anywhere; }
+    .cardHeader { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+    .cardHeader h3 { margin:0; }
+    .resultCount { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border:1px solid rgba(56,189,248,.26); border-radius:999px; background:rgba(56,189,248,.09); color:var(--muted); font-size:12px; white-space:nowrap; }
+    .resultCount::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 7px rgba(56,189,248,.65); }
+    .resultCount strong { color:#bce8fd; font-size:13px; }
+    .langToggle { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-width:92px; margin-top:0; }
+    .langToggle .langIcon { display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px; background:rgba(56,189,248,.12); color:#8edcff; font-size:10px; font-weight:800; letter-spacing:-.4px; }
+    a { color:#5cc8f7; text-decoration:none; transition:color .15s ease; } a:hover { color:#9ae0ff; text-decoration:underline; }
+    table { width:100%; min-width:680px; border-collapse:collapse; font-size:12.8px; }
+    th,td { border-bottom:1px solid var(--line-soft); padding:10px 11px; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+    tbody tr { transition:background .15s ease; }
+    tbody tr:hover { background:rgba(148,163,184,.05); }
+    tbody tr:last-child td { border-bottom:0; }
+    th { color:#9db0c8; background:#0c1424; position:sticky; top:0; z-index:1; font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; }
+    .tableWrap {
+      position:relative; max-width:100%; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; -webkit-overflow-scrolling:touch;
+      max-height:560px; border:1px solid var(--line); border-radius:11px; margin-top:14px;
+      background:
+        linear-gradient(to top, var(--surface), rgba(13,21,38,0)) bottom / 100% 28px no-repeat local,
+        radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,.55), rgba(0,0,0,0)) bottom / 100% 14px no-repeat scroll,
+        var(--surface);
+    }
+    .tableWrap.short { max-height:260px; }
+    .tableWrap:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .scrollHint { margin:10px 0 -5px; color:#7488a4; font-size:11.5px; text-align:right; }
+    .taskTable { min-width:1815px; table-layout:fixed; }
+    .specTable { min-width:820px; }
+    .kbTable { min-width:760px; }
+    .kbHistoryTable { min-width:920px; }
+    .kbHistoryTable tr.selected { background:rgba(56,189,248,.10); }
+    .historyVersion { white-space:nowrap; }
+    .historyReason { display:-webkit-box; max-width:220px; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; }
+    .historyChangeBadges { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+    .changeBadge { display:inline-flex; min-width:30px; justify-content:center; padding:2px 7px; border:1px solid var(--line); border-radius:999px; font-size:11px; font-weight:700; }
+    .changeBadge.added { color:#86efac; border-color:rgba(34,197,94,.34); background:rgba(34,197,94,.11); }
+    .changeBadge.modified { color:#fcd34d; border-color:rgba(245,158,11,.34); background:rgba(245,158,11,.11); }
+    .changeBadge.removed { color:#fca5a5; border-color:rgba(239,68,68,.34); background:rgba(239,68,68,.11); }
+    .changeBadge.fields { color:#7dd3fc; border-color:rgba(56,189,248,.34); background:rgba(56,189,248,.11); }
+    .historyPaths { display:grid; gap:3px; max-width:260px; margin-top:7px; }
+    .historyPath { overflow:hidden; color:#91a6c1; font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; text-overflow:ellipsis; white-space:nowrap; }
+    .kbHistoryPanel { margin-top:14px; border:1px solid var(--line); border-radius:11px; background:rgba(7,13,26,.42); }
+    .kbHistoryPanel > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:11px 13px; color:#dce6f5; font-weight:700; }
+    .kbHistoryPanel > summary::-webkit-details-marker { display:none; }
+    .kbHistoryPanel > summary::after { content:"\25be"; margin-left:0; color:var(--muted); transition:transform .2s ease; }
+    .kbHistoryPanel[open] > summary::after { transform:rotate(180deg); }
+    .kbHistoryPanel[open] > summary { border-bottom:1px solid var(--line-soft); }
+    .kbHistoryPanel .resultCount { margin-left:auto; }
+    .kbHistoryBody { padding:0 13px 13px; }
+    .historyStatus { min-height:18px; margin-top:10px; }
+    .historyStatus.error { color:#fca5a5; }
+    .historyDetail { margin-top:14px; padding:14px; border:1px solid #2b3d5c; border-radius:11px; background:#0a1221; }
+    .historyDetail[hidden] { display:none; }
+    .historyMeta { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr)); gap:9px; margin-top:12px; }
+    .historyMetaItem { min-width:0; padding:9px 10px; border:1px solid var(--line-soft); border-radius:9px; background:var(--surface); }
+    .historyMetaItem span { display:block; color:var(--muted); font-size:11px; }
+    .historyMetaItem strong { display:block; margin-top:2px; overflow-wrap:anywhere; color:#dce6f5; font-size:12.5px; }
+    .historyChanges { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:9px; margin-top:10px; }
+    .historyChangeGroup { min-width:0; padding:10px; border:1px solid var(--line-soft); border-radius:9px; background:var(--surface); }
+    .historyChangeGroup h4 { margin:0 0 7px; color:#aebed2; font-size:11.5px; }
+    .historyTokens { display:flex; flex-wrap:wrap; gap:5px; }
+    .historyToken { max-width:100%; overflow-wrap:anywhere; padding:2px 7px; border-radius:6px; background:#1a2940; color:#c9d7e9; font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    .historyFieldTitle { margin:15px 0 0; color:#dce6f5; font-size:13px; }
+    .historyFieldWrap { max-height:360px; margin-top:8px; }
+    .historyFieldTable { min-width:860px; table-layout:fixed; }
+    .historyFieldTable th:nth-child(1) { width:245px; }
+    .historyFieldTable th:nth-child(2) { width:90px; }
+    .historyFieldTable th:nth-child(3),.historyFieldTable th:nth-child(4) { width:260px; }
+    .historyFieldTable code { display:inline-block; max-width:100%; overflow-wrap:anywhere; }
+    .historyValue { min-height:34px; max-height:140px; margin:0; padding:8px 9px; border-radius:7px; font-size:11px; line-height:1.45; white-space:pre-wrap; }
+    .historySnapshots { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:10px; margin-top:10px; }
+    .historySnapshot { min-width:0; border:1px solid var(--line-soft); border-radius:9px; background:var(--surface); }
+    .historySnapshot > summary { cursor:pointer; padding:9px 11px; color:#aebed2; font-size:12px; font-weight:700; }
+    .historySnapshot pre { max-height:360px; margin:0; border:0; border-top:1px solid var(--line-soft); border-radius:0 0 9px 9px; }
+    .taskTable th:nth-child(1) { width:160px; }
+    .taskTable th:nth-child(2) { width:150px; }
+    .taskTable th:nth-child(3) { width:225px; }
+    .taskTable th:nth-child(4) { width:160px; }
+    .taskTable th:nth-child(5),.taskTable th:nth-child(6) { width:215px; }
+    .taskTable th:nth-child(7) { width:190px; }
+    .taskTable th:nth-child(8) { width:220px; }
+    .taskTable th:nth-child(9) { width:100px; }
+    .taskTable th:nth-child(10) { width:180px; }
+    .taskTable td:nth-child(4) b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .identifier { display:-webkit-box; max-width:210px; overflow:hidden; overflow-wrap:anywhere; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; color:#9db0c8; }
+    .tableActions { display:flex; min-width:0; flex-wrap:wrap; align-items:flex-start; gap:6px; }
+    .editorArea { min-height:360px; }
+    .editorArea.codeEditor { min-height:420px; }
+    details.panel { padding:0; }
+    details.panel > summary {
+      min-width:0; list-style:none; cursor:pointer; padding:16px 18px; display:flex; align-items:center; gap:10px;
+      font-size:15px; font-weight:700; color:#dce6f5; border-radius:var(--radius); transition:background .16s ease;
+    }
+    .panelHint { min-width:0; flex:1 1 260px; font-weight:400; overflow-wrap:anywhere; }
+    details.panel > summary::-webkit-details-marker { display:none; }
+    details.panel > summary::after { content:"\25be"; margin-left:auto; color:var(--muted); font-size:13px; transition:transform .2s ease; }
+    details.panel[open] > summary::after { transform:rotate(180deg); }
+    details.panel > summary:hover { background:rgba(148,163,184,.06); }
+    details.panel[open] > summary { border-bottom:1px solid var(--line-soft); border-radius:var(--radius) var(--radius) 0 0; }
+    .panelBody { padding:2px 18px 18px; }
+    pre.out:empty { display:none; }
+    .note { border-left:3px solid var(--accent); background:linear-gradient(90deg,var(--accent-soft),rgba(56,189,248,0)); padding:10px 13px; border-radius:9px; margin-bottom:14px; font-size:12.5px; color:#c5d5e8; }
+    @media(max-width:900px) {
+      body.navOpen { overflow:hidden; }
+      .app { display:block; }
+      aside {
+        position:fixed; inset:0 auto 0 0; z-index:60; width:min(300px,calc(100vw - 44px)); height:100dvh;
+        visibility:hidden; transform:translateX(-105%); transition:transform .24s ease,visibility .24s ease;
+        box-shadow:24px 0 50px rgba(0,0,0,.48);
+      }
+      aside.open { visibility:visible; transform:translateX(0); }
+      .navScrim { display:block; position:fixed; inset:0; z-index:50; visibility:hidden; opacity:0; background:rgba(2,6,16,.68); backdrop-filter:blur(3px); transition:opacity .2s ease,visibility .2s ease; }
+      .navScrim.open { visibility:visible; opacity:1; }
+      .menuToggle,.navClose { display:inline-flex; }
+      .brand { padding-right:4px; }
+      main { padding:18px; overflow:visible; }
+      .grid { grid-template-columns:1fr; }
+      .topbar { align-items:flex-start; }
+      .topbarActions { margin-left:0; }
+    }
+    @media(max-width:640px) {
+      main { padding:14px; }
+      .topbar { gap:12px; margin-bottom:16px; }
+      .topbarTitle { width:100%; }
+      .topbarActions { display:grid; width:100%; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; }
+      .topbarActions .badge { display:flex; min-height:40px; align-items:center; justify-content:center; }
+      .topbarActions button { min-height:40px; padding:8px 11px; }
+      .sourceHeader { align-items:stretch; }
+      .sourceHeader > label { flex:1 0 100%; }
+      .segmented { flex-basis:100%; width:100%; }
+      .grid4 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+      .card { padding:15px; }
+      .metric { padding:13px; }
+      .metric .num { font-size:25px; }
+      .panelBody { padding:2px 15px 15px; }
+      details.panel > summary { padding:14px 15px; }
+      input,textarea,select { font-size:16px; }
+      pre { max-height:min(320px,55vh); }
+      .tableWrap { max-height:420px; }
+      .editorArea,.editorArea.codeEditor { min-height:280px; }
+      .actionBar button { flex:1 1 calc(50% - 5px); min-height:42px; }
+      .toastHost { top:12px; right:12px; left:12px; width:auto; }
+    }
+    @media(max-width:420px) {
+      .topbarActions { grid-template-columns:1fr 1fr; }
+      .topbarActions .badge { grid-column:1 / -1; }
+      .topbarActions button { width:100%; min-width:0; }
+      .langToggle { min-width:0; }
+      .segmented button { padding-inline:5px; font-size:11px; }
+      .panelHint { display:none; }
+      .card { padding:14px; border-radius:12px; }
+      .grid4 { gap:8px; }
+      .metric { padding:12px; }
+      .actionBar button { flex-basis:100%; }
+    }
+    @media(prefers-reduced-motion:reduce) {
+      *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; }
+    }
   </style>
 </head>
 <body>
+<div class="toastHost" id="toastHost" role="status" aria-live="polite" aria-atomic="false"></div>
 <div class="app">
-  <aside>
-    <div class="brand"><h1>AI Security Gate</h1><p>AI驱动的安全评审威胁建模</p></div>
+  <aside id="sidebar" aria-label="Primary navigation">
+    <div class="brand"><div class="brandRow"><h1>AI Security Gate</h1><button class="iconButton navClose" id="navClose" type="button" aria-label="关闭导航" onclick="setNavOpen(false)">×</button></div><p data-i18n="brand.subtitle">AI 驱动的安全评审与威胁建模</p></div>
     <div class="nav">
-      <button class="active" onclick="showTab('dashboard', this)">Dashboard</button>
-      <button onclick="showTab('newTask', this)">Threat Modeling Review</button>
-      <button onclick="showTab('taskList', this)">AI Gate Task List</button>
-      <button onclick="showTab('reports', this)">Report Review</button>
-      <button onclick="showTab('kb', this)">金标准知识库</button>
-      <button onclick="showTab('apiHelp', this)">全局配置</button>
+      <button class="active" aria-current="page" data-i18n="nav.tasks" onclick="showTab('taskList', this)">工单总览</button>
+      <button data-i18n="nav.review" onclick="showTab('newTask', this)">威胁建模评审</button>
+      <button data-i18n="nav.reports" onclick="showTab('reports', this)">报告评审与审批</button>
+      <button data-i18n="nav.kb" onclick="showTab('kb', this)">金标准知识库</button>
+      <button data-i18n="nav.api" onclick="showTab('apiHelp', this)">接口调用示例</button>
     </div>
   </aside>
+  <div class="navScrim" id="navScrim" aria-hidden="true" onclick="setNavOpen(false)"></div>
 
   <main>
     <div class="topbar">
-      <div><h2 id="pageTitle">Dashboard</h2></div>
-      <div class="row"><button class="secondary" onclick="refreshAll()">Refresh</button><button class="secondary" onclick="health()">Health</button></div>
+      <div class="topbarTitle"><button class="iconButton menuToggle" id="menuToggle" type="button" aria-label="打开导航" aria-controls="sidebar" aria-expanded="false" onclick="setNavOpen(true)"><span class="menuBars" aria-hidden="true"><span></span><span></span><span></span></span></button><div><h2 id="pageTitle">工单总览</h2><p class="topbarSubtitle" data-i18n="topbar.subtitle">安全评审工作台</p></div></div>
+      <div class="row topbarActions">
+        <span class="badge" id="healthBadge" data-i18n="status.checking">检查中</span>
+        <button class="secondary langToggle" id="langToggle" onclick="toggleLanguage()"><span class="langIcon" aria-hidden="true">中/EN</span><span id="langToggleText">English</span></button>
+        <button class="secondary" data-i18n="common.refreshData" onclick="refreshAll()">刷新数据</button>
+      </div>
     </div>
 
-    <section id="dashboard" class="tab active">
-      <div class="grid4">
-        <div class="metric"><div class="num" id="mTask">0</div><div class="label">Review Tasks</div></div>
-        <div class="metric"><div class="num" id="mActivity">0</div><div class="label">Gate Runs</div></div>
-        <div class="metric"><div class="num" id="mReport">0</div><div class="label">Reports</div></div>
-        <div class="metric"><div class="num" id="mApproved">0</div><div class="label">Approved</div></div>
-      </div>
-      <div class="card" style="margin-top:16px"><h3>最新 Review Task</h3><div class="tableWrap"><table><thead><tr><th>Code</th><th>Product / Version</th><th>Flow</th><th>Updated</th><th>Reports</th></tr></thead><tbody id="latestTasksBody"></tbody></table></div></div>
-      <pre id="healthOut">等待检查...</pre>
-    </section>
-
     <section id="newTask" class="tab">
-      <div class="card" style="margin-bottom:16px">
-        <h3>Spec 文件</h3>
-        <div class="row"><input id="specUpload" type="file" multiple accept=".md,.markdown,.txt,.json,.yaml,.yml"><button onclick="uploadSpecs()">上传到 specs</button><button class="secondary" onclick="loadSpecs()">刷新列表</button></div>
-        <div class="tableWrap"><table><thead><tr><th>文件</th><th>路径</th><th>大小</th><th>更新时间</th><th>加入文档</th></tr></thead><tbody id="specsBody"></tbody></table></div>
-        <pre id="specOut">等待上传...</pre>
-      </div>
+      <details class="card panel" style="margin-bottom:16px">
+        <summary><span data-i18n="spec.title">Spec 文件</span><span class="badge" id="specCount">0</span><span class="muted small panelHint" data-i18n="spec.hint">上传文档，或把已有文档一键加入下方的 Gate 输入</span></summary>
+        <div class="panelBody">
+          <div class="row"><input id="specUpload" type="file" multiple accept=".md,.markdown,.txt,.json,.yaml,.yml"><button data-i18n="common.upload" onclick="uploadSpecs()">上传</button><button class="secondary" data-i18n="common.refresh" onclick="loadSpecs()">刷新</button></div>
+          <div class="tableWrap short" tabindex="0"><table class="specTable"><thead><tr><th data-i18n="table.file">文件</th><th data-i18n="table.path">路径</th><th data-i18n="table.size">大小</th><th data-i18n="table.updated">更新时间</th><th data-i18n="table.addToInput">加入文档</th></tr></thead><tbody id="specsBody"></tbody></table></div>
+          <pre id="specOut" class="out"></pre>
+        </div>
+      </details>
       <div class="grid">
         <div class="card">
           <h3>Gate1 Review</h3>
-          <div class="two"><div><label>Product Name</label><input id="g1Product" value="Demo Security Gate Product"></div><div><label>Product Version</label><input id="g1Version" value="v1.0.0"></div></div>
-          <div class="three"><div><label>Project ID</label><input id="g1Project" value="demo"></div><div><label>Repository</label><input id="g1Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g1Branch" value="main"></div></div>
-          <label>Gate1 Requirement Documents</label><textarea id="g1Docs">specs/product-requirements.md
+          <div class="two"><div><label data-i18n="field.productName">产品名称</label><input id="g1Product" value="Demo Security Gate Product"></div><div><label data-i18n="field.productVersion">产品版本</label><input id="g1Version" value="v1.0.0"></div></div>
+          <div class="three"><div><label data-i18n="field.projectId">项目 ID</label><input id="g1Project" value="demo"></div><div><label data-i18n="field.repository">代码仓库</label><input id="g1Repo" value="quy7_roche/AI_Security_Gate"></div><div><label data-i18n="field.branch">分支</label><input id="g1Branch" value="main"></div></div>
+          <div class="two"><div><label data-i18n="field.gate1Kb">Gate1 金标准知识库</label><select id="g1Kb"></select></div><div><label data-i18n="field.autoGate2Kb">自动 Gate2 金标准知识库</label><select id="g1Gate2Kb"></select></div></div>
+          <div class="sourceControl">
+            <div class="row sourceHeader"><label data-i18n="source.gate1">Gate1 输入来源</label><div class="segmented" data-source-group="g1"><button class="active" data-i18n="source.docs" data-source-mode="docs" onclick="setInputSource('g1','docs')">已有文档</button><button data-i18n="source.paste" data-source-mode="paste" onclick="setInputSource('g1','paste')">粘贴内容</button><button data-i18n="source.both" data-source-mode="both" onclick="setInputSource('g1','both')">两者合并</button></div></div>
+            <div class="sourcePanel" data-source-panel="g1-docs"><label data-i18n="source.gate1Docs">Gate1 文档路径</label><textarea id="g1Docs">specs/product-requirements.md
 specs/user-stories.md
-specs/business-flow.md</textarea>
-          <label>Gate2 Documents for Auto-run after Gate1 Approve</label><textarea id="g1Gate2Docs">specs/architecture.md
+specs/business-flow.md</textarea></div>
+            <div class="sourcePanel" data-source-panel="g1-paste"><label data-i18n="source.gate1Paste">Gate1 粘贴内容</label><textarea id="g1Text" data-i18n-placeholder="placeholder.gate1" placeholder="可以直接粘贴业务需求、用户故事或流程说明"></textarea></div>
+          </div>
+          <div class="sourceControl">
+            <div class="row sourceHeader"><label data-i18n="source.autoGate2">自动 Gate2 输入来源</label><div class="segmented" data-source-group="g1Gate2"><button class="active" data-i18n="source.docs" data-source-mode="docs" onclick="setInputSource('g1Gate2','docs')">已有文档</button><button data-i18n="source.paste" data-source-mode="paste" onclick="setInputSource('g1Gate2','paste')">粘贴内容</button><button data-i18n="source.both" data-source-mode="both" onclick="setInputSource('g1Gate2','both')">两者合并</button></div></div>
+            <div class="sourcePanel" data-source-panel="g1Gate2-docs"><label data-i18n="source.autoGate2Docs">自动 Gate2 文档路径</label><textarea id="g1Gate2Docs">specs/architecture.md
 specs/api-design.md
 specs/data-model.md
-specs/implementation-plan.md</textarea>
-          <div class="two"><div><label>Threshold</label><input id="g1Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g1TriggeredBy" value="ui"></div></div>
-          <button onclick="runGate1()">Run Gate1</button>
-          <pre id="g1Out">等待运行...</pre>
+specs/implementation-plan.md</textarea></div>
+            <div class="sourcePanel" data-source-panel="g1Gate2-paste"><label data-i18n="source.autoGate2Paste">自动 Gate2 粘贴内容</label><textarea id="g1Gate2Text" data-i18n-placeholder="placeholder.autoGate2" placeholder="Gate1 审批后自动运行 Gate2 时使用，可留空"></textarea></div>
+          </div>
+          <div class="two"><div><label data-i18n="field.threshold">匹配阈值</label><input id="g1Threshold" type="number" step="0.01" value="0.78"></div><div><label data-i18n="field.triggeredBy">触发来源</label><input id="g1TriggeredBy" value="ui"></div></div>
+          <button data-i18n="action.runGate1" onclick="runGate1()">运行 Gate1</button>
+          <pre id="g1Out" class="out"></pre>
         </div>
 
         <div class="card">
           <h3>Gate2 Review</h3>
-          <div class="note">若 task_id 与 gate1_report 留空，将作为独立 Gate2 评审运行。</div>
-          <div class="two"><div><label>Product Name</label><input id="g2Product" value="Demo Security Gate Product"></div><div><label>Product Version</label><input id="g2Version" value="v1.0.0"></div></div>
-          <label>Existing Task ID / Code</label><input id="g2TaskId" placeholder="例如 task-xxx 或 TASK-000001，可留空">
-          <div class="three"><div><label>Project ID</label><input id="g2Project" value="demo"></div><div><label>Repository</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate"></div><div><label>Branch</label><input id="g2Branch" value="main"></div></div>
-          <label>Gate2 Documents</label><textarea id="g2Docs">specs/architecture.md
+          <div class="note" data-i18n="gate2.standaloneHint">若任务 ID 与 Gate1 报告均留空，将作为独立 Gate2 评审运行。</div>
+          <div class="two"><div><label data-i18n="field.productName">产品名称</label><input id="g2Product" value="Demo Security Gate Product"></div><div><label data-i18n="field.productVersion">产品版本</label><input id="g2Version" value="v1.0.0"></div></div>
+          <label data-i18n="field.existingTask">已有任务 ID / 编号</label><input id="g2TaskId" data-i18n-placeholder="placeholder.existingTask" placeholder="例如 task-xxx 或 TASK-000001，可留空">
+          <div class="three"><div><label data-i18n="field.projectId">项目 ID</label><input id="g2Project" value="demo"></div><div><label data-i18n="field.repository">代码仓库</label><input id="g2Repo" value="quy7_roche/AI_Security_Gate"></div><div><label data-i18n="field.branch">分支</label><input id="g2Branch" value="main"></div></div>
+          <label data-i18n="field.gate2Kb">Gate2 金标准知识库</label><select id="g2Kb"></select>
+          <div class="sourceControl">
+            <div class="row sourceHeader"><label data-i18n="source.gate2">Gate2 输入来源</label><div class="segmented" data-source-group="g2"><button class="active" data-i18n="source.docs" data-source-mode="docs" onclick="setInputSource('g2','docs')">已有文档</button><button data-i18n="source.paste" data-source-mode="paste" onclick="setInputSource('g2','paste')">粘贴内容</button><button data-i18n="source.both" data-source-mode="both" onclick="setInputSource('g2','both')">两者合并</button></div></div>
+            <div class="sourcePanel" data-source-panel="g2-docs"><label data-i18n="source.gate2Docs">Gate2 文档路径</label><textarea id="g2Docs">specs/architecture.md
 specs/api-design.md
 specs/data-model.md
-specs/implementation-plan.md</textarea>
-          <label>Gate1 Report Path（可留空：同 task 下自动查找最新 Gate1 report）</label><input id="g2Gate1Report" value="">
-          <div class="two"><div><label>Threshold</label><input id="g2Threshold" type="number" step="0.01" value="0.78"></div><div><label>Triggered By</label><input id="g2TriggeredBy" value="ui-direct-gate2"></div></div>
-          <button onclick="runGate2()">Run Gate2</button>
-          <pre id="g2Out">等待运行...</pre>
+specs/implementation-plan.md</textarea></div>
+            <div class="sourcePanel" data-source-panel="g2-paste"><label data-i18n="source.gate2Paste">Gate2 粘贴内容</label><textarea id="g2Text" data-i18n-placeholder="placeholder.gate2" placeholder="可以直接粘贴架构设计、API 设计、数据模型或实现计划"></textarea></div>
+          </div>
+          <label data-i18n="field.gate1ReportPath">Gate1 报告路径（可留空：自动查找同一任务的最新报告）</label><input id="g2Gate1Report" value="">
+          <div class="two"><div><label data-i18n="field.threshold">匹配阈值</label><input id="g2Threshold" type="number" step="0.01" value="0.78"></div><div><label data-i18n="field.triggeredBy">触发来源</label><input id="g2TriggeredBy" value="ui-direct-gate2"></div></div>
+          <button data-i18n="action.runGate2" onclick="runGate2()">运行 Gate2</button>
+          <pre id="g2Out" class="out"></pre>
         </div>
       </div>
     </section>
 
-    <section id="taskList" class="tab">
-      <div class="card">
-        <h3>Review工单详情</h3>
-        <div class="three"><div><label>Product</label><select id="filterProduct"></select></div><div><label>Version</label><select id="filterVersion"></select></div><div><label>Task</label><select id="filterTask"></select></div></div>
-        <div class="row"><button onclick="loadTasks()">Search</button><button class="secondary" onclick="clearFilters()">Show All</button></div>
-        <div class="tableWrap"><table><thead><tr><th>Serial / Code</th><th>Product / Version</th><th>Task Name</th><th>Flow / Result</th><th>Gate1</th><th>Gate2</th><th>Approval / Trigger</th><th>Auto Gate2</th><th>Final</th><th>Action</th></tr></thead><tbody id="tasksBody"></tbody></table></div>
-        <pre id="taskOut">等待加载...</pre>
+    <section id="taskList" class="tab active">
+      <div class="grid4">
+        <div class="metric"><div class="num" id="mTask">0</div><div class="label" data-i18n="metric.tasks">Review 工单</div></div>
+        <div class="metric"><div class="num" id="mActivity">0</div><div class="label" data-i18n="metric.runs">Gate 运行</div></div>
+        <div class="metric"><div class="num" id="mReport">0</div><div class="label" data-i18n="metric.reports">报告</div></div>
+        <div class="metric"><div class="num" id="mApproved">0</div><div class="label" data-i18n="metric.approved">已审批</div></div>
       </div>
+      <div class="card" style="margin-top:16px">
+        <div class="cardHeader">
+          <h3 data-i18n="tasks.title">Review 工单详情</h3>
+          <div class="resultCount" aria-live="polite"><span data-i18n="tasks.showing">当前显示</span> <strong id="taskCount">0</strong> <span data-i18n="tasks.unit">个任务</span></div>
+        </div>
+        <div class="filterChips" id="taskStatusFilters" role="group"></div>
+        <details class="kbHistoryPanel" id="taskFilterPanel">
+          <summary data-i18n="tasks.filterPanel">按产品 / 版本 / 任务筛选</summary>
+          <div class="kbHistoryBody">
+            <div class="three"><div><label data-i18n="field.product">产品</label><select id="filterProduct"></select></div><div><label data-i18n="field.version">版本</label><select id="filterVersion"></select></div><div><label data-i18n="field.task">任务</label><select id="filterTask"></select></div></div>
+            <div class="row"><button data-i18n="action.filter" onclick="loadTasks()">筛选</button><button class="secondary" data-i18n="action.showAll" onclick="clearFilters()">显示全部</button></div>
+          </div>
+        </details>
+        <div class="taskCards" id="taskCards"></div>
+        <details class="kbHistoryPanel" style="margin-top:16px">
+          <summary data-i18n="tasks.tableView">完整字段表格</summary>
+          <div class="kbHistoryBody">
+            <p class="scrollHint" data-i18n="tasks.scrollHint">可横向滚动查看完整工单信息</p>
+            <div class="tableWrap" tabindex="0"><table class="taskTable"><thead><tr><th data-i18n="table.taskCode">任务编号</th><th data-i18n="table.productVersion">产品 / 版本</th><th data-i18n="table.taskName">任务名称</th><th data-i18n="table.flowResult">流程 / 结果</th><th>Gate1</th><th>Gate2</th><th data-i18n="table.approvalTrigger">审批 / 触发</th><th data-i18n="table.autoGate2">自动 Gate2</th><th data-i18n="table.final">最终报告</th><th data-i18n="table.action">操作</th></tr></thead><tbody id="tasksBody"></tbody></table></div>
+          </div>
+        </details>
+        <pre id="taskOut" class="out"></pre>
+      </div>
+      <pre id="healthOut" class="out"></pre>
     </section>
 
     <section id="reports" class="tab">
       <div class="card">
-        <div class="three"><div><label>Task</label><select id="reportTask" onchange="onReportTaskChange()"></select></div><div><label>Review ID</label><select id="reportReview" onchange="onReviewSelect()"></select></div><div><label>Reviewer</label><input id="reviewer" value="security.reviewer@example.com"></div></div>
-        <div class="row"><button class="secondary" onclick="openReport()">Open</button><button class="secondary" onclick="downloadReport()">Download</button><button class="secondary" onclick="loadReportForEdit()">Load for Edit</button><button onclick="saveReport()">Save Edited Report</button><button class="ok" onclick="approveSelectedReport()">Approve</button></div>
-        <label>Report Content</label><textarea id="reportContent" style="min-height:360px"></textarea>
-        <pre id="reportOut">等待操作...</pre>
+        <h3 data-i18n="reports.title">报告评审与审批</h3>
+        <div class="three"><div><label data-i18n="field.task">任务</label><select id="reportTask" onchange="onReportTaskChange()"></select></div><div><label data-i18n="field.reviewId">评审 ID</label><select id="reportReview" onchange="onReviewSelect()"></select></div><div><label data-i18n="field.reviewer">审批人</label><input id="reviewer" value="security.reviewer@example.com"></div></div>
+        <div class="taskCards" id="reportTaskCard"></div>
+        <div class="row actionBar"><button class="secondary" data-i18n="action.view" onclick="openReport()">查看</button><button class="secondary" data-i18n="action.download" onclick="downloadReport()">下载</button><button class="secondary" data-i18n="action.loadEdit" onclick="loadReportForEdit()">载入编辑</button><button data-i18n="action.saveChanges" onclick="saveReport()">保存修改</button><button class="ok" data-i18n="action.approve" onclick="approveSelectedReport()">审批通过</button><button class="warn" id="jiraBtn" data-i18n="action.sendJira" onclick="sendReportToJira()">发送到 Jira</button></div>
+        <div class="statusStrip" id="reportStatus"><span class="statusIcon" id="reportStatusIcon" aria-hidden="true"></span><div class="statusBody"><strong id="reportStatusTitle"></strong><span id="reportStatusDetail"></span></div></div>
+        <label data-i18n="field.reportContent">报告内容</label><textarea id="reportContent" class="editorArea"></textarea>
+        <pre id="reportOut" class="out"></pre>
       </div>
     </section>
 
     <section id="kb" class="tab">
-      <div class="grid"><div class="card"><h3>Golden Knowledge Base</h3><label>Gate</label><select id="kbGate"><option value="gate1">gate1</option><option value="gate2">gate2</option></select><div class="row"><button class="secondary" onclick="loadKb()">Load KB</button><button onclick="saveKb()">Manual Save KB</button><button class="secondary" onclick="loadKbHistory()">History</button></div><div class="three"><div><label>Version</label><input id="kbVersion" value="1.0.1"></div><div><label>Updated By</label><input id="kbUpdatedBy" value="security.admin@example.com"></div><div><label>Reason</label><input id="kbReason" value="Manual update from UI"></div></div><label>KB JSON</label><textarea id="kbContent" style="min-height:420px"></textarea></div><div class="card"><h3>KB Output</h3><pre id="kbOut">等待操作...</pre></div></div>
+      <div class="grid">
+        <div class="card">
+          <h3 data-i18n="kb.title">金标准知识库</h3>
+          <div class="two"><div><label>Gate</label><select id="kbGate" onchange="onKbGateChange()"><option value="gate1">gate1</option><option value="gate2">gate2</option></select></div><div><label data-i18n="field.knowledgeBase">知识库</label><select id="kbId" onchange="onKbSelectionChange()"></select></div></div>
+          <div class="row actionBar"><button class="secondary" data-i18n="action.refreshCatalog" onclick="loadKbCatalogs()">刷新目录</button><button class="secondary" data-i18n="action.loadKb" onclick="loadKb()">载入 KB</button><button data-i18n="action.saveKb" onclick="saveKb()">保存 KB</button><button class="secondary" data-i18n="action.history" onclick="loadKbHistory()">变更历史</button></div>
+          <details class="kbHistoryPanel" id="kbHistoryPanel" ontoggle="onKbHistoryToggle()">
+            <summary><span data-i18n="kb.historyTitle">变更记录</span><span class="resultCount" aria-live="polite"><strong id="kbHistoryCount">0</strong> <span data-i18n="kb.historyUnit">条记录</span></span></summary>
+            <div class="kbHistoryBody">
+              <div id="kbHistoryStatus" class="historyStatus small muted" role="status" aria-live="polite"></div>
+              <div class="tableWrap short" tabindex="0"><table class="kbHistoryTable"><thead><tr><th data-i18n="table.changedAt">变更时间</th><th data-i18n="table.versionChange">版本变化</th><th data-i18n="table.changeSummary">变更摘要</th><th data-i18n="table.updatedBy">更新人</th><th data-i18n="table.reason">变更原因</th><th data-i18n="table.action">操作</th></tr></thead><tbody id="kbHistoryBody"></tbody></table></div>
+              <div id="kbHistoryDetail" class="historyDetail" hidden>
+                <div class="cardHeader"><div><h3 data-i18n="kb.historyDetail">变更详情</h3><span id="kbHistoryDetailId" class="small muted"></span></div><button class="secondary inline" data-i18n="action.closeDetails" onclick="closeKbHistoryDetail()">关闭详情</button></div>
+                <div id="kbHistoryMeta" class="historyMeta"></div>
+                <div id="kbHistoryChanges" class="historyChanges"></div>
+                <h4 class="historyFieldTitle" data-i18n="kb.fieldChangeDetails">字段级 JSON 变更</h4>
+                <div class="tableWrap historyFieldWrap" tabindex="0"><table class="historyFieldTable"><thead><tr><th data-i18n="table.jsonPath">JSON 路径</th><th data-i18n="table.changeType">类型</th><th data-i18n="table.before">变更前</th><th data-i18n="table.after">变更后</th></tr></thead><tbody id="kbHistoryFieldChanges"></tbody></table></div>
+                <div class="historySnapshots">
+                  <details class="historySnapshot"><summary data-i18n="kb.previousSnapshot">变更前快照</summary><pre id="kbPreviousSnapshot"></pre></details>
+                  <details class="historySnapshot"><summary data-i18n="kb.newSnapshot">变更后快照</summary><pre id="kbNewSnapshot"></pre></details>
+                </div>
+              </div>
+            </div>
+          </details>
+          <div class="three"><div><label data-i18n="field.version">版本</label><input id="kbVersion" value="1.0.1"></div><div><label data-i18n="field.updatedBy">更新人</label><input id="kbUpdatedBy" value="security.admin@example.com"></div><div><label data-i18n="field.reason">变更原因</label><input id="kbReason" value="Manual update from UI"></div></div>
+          <label>KB JSON</label><textarea id="kbContent" class="editorArea codeEditor"></textarea>
+        </div>
+        <div class="card">
+          <h3 data-i18n="kb.uploadTitle">上传金标准知识库</h3>
+          <label data-i18n="field.kbJsonFile">KB JSON 文件</label><input id="kbUpload" type="file" accept=".json,application/json">
+          <div class="two"><div><label data-i18n="field.kbId">知识库 ID</label><input id="kbUploadId" placeholder="cloud-service"></div><div><label data-i18n="field.name">名称</label><input id="kbUploadName" placeholder="Cloud Service KB"></div></div>
+          <div class="two"><div><label data-i18n="field.category">类别</label><input id="kbUploadCategory" placeholder="Cloud Service"></div><div><label data-i18n="field.riskLevel">风险等级</label><input id="kbUploadRisk" placeholder="Yellow"></div></div>
+          <label data-i18n="field.description">说明</label><input id="kbUploadDescription" data-i18n-placeholder="placeholder.kbDescription" placeholder="适用于云端服务的金标准知识库">
+          <button data-i18n="action.uploadKb" onclick="uploadKb()">上传 KB</button>
+          <h3 style="margin-top:18px" data-i18n="kb.catalog">知识库目录</h3>
+          <div class="tableWrap short" tabindex="0"><table class="kbTable"><thead><tr><th>ID</th><th data-i18n="table.name">名称</th><th data-i18n="table.categoryRisk">类别 / 风险</th><th data-i18n="table.version">版本</th><th data-i18n="table.scenarios">场景数</th><th data-i18n="table.action">操作</th></tr></thead><tbody id="kbCatalogBody"></tbody></table></div>
+          <pre id="kbOut" class="out"></pre>
+        </div>
+      </div>
     </section>
 
     <section id="apiHelp" class="tab">
@@ -187,55 +607,192 @@ python cli/security_gate_cli.py gate2 run \
 </div>
 
 <script>
-const state={catalog:null,tasks:[],specs:[],selectedTask:'',selectedReview:''};
+const I18N={
+  zh:{
+    'brand.subtitle':'AI 驱动的安全评审与威胁建模',
+    'topbar.subtitle':'安全评审工作台','nav.open':'打开导航','nav.close':'关闭导航',
+    'nav.review':'威胁建模评审','nav.tasks':'工单总览','nav.reports':'报告评审与审批','nav.kb':'金标准知识库','nav.api':'接口调用示例',
+    'status.checking':'检查中','status.ok':'服务正常','status.error':'服务异常','status.unreachable':'服务不可达',
+    'common.refreshData':'刷新数据','common.upload':'上传','common.refresh':'刷新',
+    'toast.close':'关闭通知','toast.success':'操作成功','toast.failed':'操作失败','toast.pending':'处理中',
+    'jira.sending':'正在发送到 Jira…','jira.sendingDetail':'评审 {{review}}','jira.created':'已创建 Jira 单','jira.createdDetail':'{{key}}（报告已作为附件上传）','jira.attachFailed':'Jira 单已创建，附件上传失败','jira.failedTitle':'发送到 Jira 失败','jira.notConfigured':'Jira 未配置','jira.openIssue':'打开 Jira 单','toast.approveDone':'已审批通过','toast.saveDone':'报告已保存','toast.gate1Done':'Gate1 评审已完成','toast.gate2Done':'Gate2 评审已完成','toast.taskCreated':'工单 {{task}} 已创建，评审 {{review}}，已为你跳转到工单总览','action.finalToJira':'最终报告 → Jira','toast.reviewRef':'评审 {{review}}',
+    'metric.tasks':'Review 工单','metric.runs':'Gate 运行','metric.reports':'报告','metric.approved':'已审批',
+    'dashboard.latestTasks':'最新 Review 工单',
+    'spec.title':'Spec 文件','spec.hint':'上传文档，或把已有文档一键加入下方的 Gate 输入','spec.files':'{{count}} 个文件',
+    'table.code':'编号','table.productVersion':'产品 / 版本','table.flow':'流程','table.updated':'更新时间','table.reports':'报告','table.file':'文件','table.path':'路径','table.size':'大小','table.addToInput':'加入文档','table.taskCode':'任务编号','table.taskName':'任务名称','table.flowResult':'流程 / 结果','table.approvalTrigger':'审批 / 触发','table.autoGate2':'自动 Gate2','table.final':'最终报告','table.action':'操作','table.name':'名称','table.categoryRisk':'类别 / 风险','table.version':'版本','table.scenarios':'场景数','table.changedAt':'变更时间','table.versionChange':'版本变化','table.scenarioChange':'场景数变化','table.changeSummary':'变更摘要','table.updatedBy':'更新人','table.reason':'变更原因','table.jsonPath':'JSON 路径','table.changeType':'类型','table.before':'变更前','table.after':'变更后',
+    'field.productName':'产品名称','field.productVersion':'产品版本','field.projectId':'项目 ID','field.repository':'代码仓库','field.branch':'分支','field.gate1Kb':'Gate1 金标准知识库','field.autoGate2Kb':'自动 Gate2 金标准知识库','field.threshold':'匹配阈值','field.triggeredBy':'触发来源','field.existingTask':'已有任务 ID / 编号','field.gate2Kb':'Gate2 金标准知识库','field.gate1ReportPath':'Gate1 报告路径（可留空：自动查找同一任务的最新报告）','field.product':'产品','field.version':'版本','field.task':'任务','field.reviewId':'评审 ID','field.reviewer':'审批人','field.reportContent':'报告内容','field.knowledgeBase':'知识库','field.updatedBy':'更新人','field.reason':'变更原因','field.kbJsonFile':'KB JSON 文件','field.kbId':'知识库 ID','field.name':'名称','field.category':'类别','field.riskLevel':'风险等级','field.description':'说明',
+    'source.gate1':'Gate1 输入来源','source.autoGate2':'自动 Gate2 输入来源','source.gate2':'Gate2 输入来源','source.docs':'已有文档','source.paste':'粘贴内容','source.both':'两者合并','source.gate1Docs':'Gate1 文档路径','source.gate1Paste':'Gate1 粘贴内容','source.autoGate2Docs':'自动 Gate2 文档路径','source.autoGate2Paste':'自动 Gate2 粘贴内容','source.gate2Docs':'Gate2 文档路径','source.gate2Paste':'Gate2 粘贴内容',
+    'placeholder.gate1':'可以直接粘贴业务需求、用户故事或流程说明','placeholder.autoGate2':'Gate1 审批后自动运行 Gate2 时使用，可留空','placeholder.existingTask':'例如 task-xxx 或 TASK-000001，可留空','placeholder.gate2':'可以直接粘贴架构设计、API 设计、数据模型或实现计划','placeholder.kbDescription':'适用于云端服务的金标准知识库',
+    'gate2.standaloneHint':'若任务 ID 与 Gate1 报告均留空，将作为独立 Gate2 评审运行。',
+    'tasks.title':'Review 工单详情','tasks.showing':'当前显示','tasks.unit':'个任务','tasks.scrollHint':'可横向滚动查看完整工单信息',
+    'tasks.tableView':'完整字段表格','tasks.filterPanel':'按产品 / 版本 / 任务筛选',
+    'flow.all':'全部','flow.running':'进行中','flow.approval':'待审批','flow.done':'已完成','flow.failed':'失败',
+    'stage.gate1':'Gate1 评审','stage.gate1Approval':'Gate1 审批','stage.gate2':'Gate2 评审','stage.gate2Approval':'Gate2 审批',
+    'reports.title':'报告评审与审批','kb.title':'金标准知识库','kb.uploadTitle':'上传金标准知识库','kb.catalog':'知识库目录','kb.historyTitle':'变更记录','kb.historyUnit':'条记录','kb.historyDetail':'变更详情','kb.addedScenarios':'新增场景','kb.modifiedScenarios':'修改场景','kb.removedScenarios':'删除场景','kb.changedFields':'其他变更字段','kb.fieldChangeDetails':'字段级 JSON 变更','kb.fieldCount':'字段 {{count}}','kb.moreChanges':'另有 {{count}} 项','kb.previousSnapshot':'变更前快照','kb.newSnapshot':'变更后快照','kb.none':'无',
+    'change.added':'新增','change.modified':'修改','change.removed':'删除',
+    'action.runGate1':'运行 Gate1','action.runGate2':'运行 Gate2','action.filter':'筛选','action.showAll':'显示全部','action.view':'查看','action.download':'下载','action.loadEdit':'载入编辑','action.saveChanges':'保存修改','action.approve':'审批通过','action.sendJira':'发送到 Jira','action.refreshCatalog':'刷新目录','action.loadKb':'载入 KB','action.saveKb':'保存 KB','action.history':'变更历史','action.uploadKb':'上传 KB','action.load':'载入','action.viewDetails':'查看详情','action.closeDetails':'关闭详情','action.approveGate1':'审批 G1','action.approveGate2':'审批 G2','action.retryGate2':'重试 G2',
+    'filter.allProducts':'全部产品','filter.allVersions':'全部版本','filter.allTasks':'全部任务',
+    'link.view':'查看','link.download':'下载','link.final':'最终报告',
+    'task.started':'启动','task.trigger':'触发来源',
+    'message.noTasks':'暂无任务','message.noMatchingTasks':'暂无符合条件的任务','message.noSpecs':'暂无 Spec 文件','message.noKbs':'暂无知识库','message.noKbHistory':'当前知识库暂无变更记录','message.noFieldChanges':'没有字段级变更','message.loadingKbHistory':'正在加载变更记录…','message.kbHistoryLoadFailed':'变更记录加载失败：{{error}}','message.kbHistoryDetailFailed':'变更详情加载失败：{{error}}','message.noPreviousSnapshot':'首次创建，无变更前快照','message.healthFailed':'健康检查失败：{{error}}','message.initFailed':'初始化失败：{{error}}','message.selectReview':'请先选择一份报告。','message.loaded':'已载入。','message.failed':'操作失败。','message.invalidJson':'JSON 无效：{{error}}','message.selectSpec':'请选择要上传的 Spec 文件。','message.specListFailed':'Spec 列表加载失败：{{error}}','message.specAdded':'已加入 {{path}}','message.uploadFailed':'上传失败：{{error}}','message.selectKbFile':'请选择要上传的 KB JSON 文件。','message.kbIdRequired':'知识库 ID 不能为空。','message.kbCatalogFailed':'知识库目录加载失败：{{error}}','message.jiraMissing':'Jira 未配置。请在 .env 中设置：{{fields}}','message.jiraMissingTitle':'Jira 未配置，需要设置 {{fields}}','message.jiraSending':'正在发送 {{review}} 到 Jira…','message.jiraFailed':'发送到 Jira 失败：{{error}}','message.taskSelected':'已选择 {{task}}，可前往“报告评审与审批”查看。','message.emptyInput':'{{label}}已选择“{{mode}}”，但没有可提交内容。',
+    'language.switch':'切换为英文'
+  },
+  en:{
+    'brand.subtitle':'AI-powered security review and threat modeling',
+    'topbar.subtitle':'Security review workspace','nav.open':'Open navigation','nav.close':'Close navigation',
+    'nav.review':'Threat Modeling Review','nav.tasks':'Task Overview','nav.reports':'Report Review & Approval','nav.kb':'Golden Knowledge Base','nav.api':'API Examples',
+    'status.checking':'Checking','status.ok':'Service healthy','status.error':'Service error','status.unreachable':'Service unavailable',
+    'common.refreshData':'Refresh Data','common.upload':'Upload','common.refresh':'Refresh',
+    'toast.close':'Dismiss notification','toast.success':'Success','toast.failed':'Failed','toast.pending':'In progress',
+    'jira.sending':'Sending to Jira…','jira.sendingDetail':'Review {{review}}','jira.created':'Jira issue created','jira.createdDetail':'{{key}} (report attached)','jira.attachFailed':'Jira issue created, attachment upload failed','jira.failedTitle':'Failed to send to Jira','jira.notConfigured':'Jira is not configured','jira.openIssue':'Open Jira issue','toast.approveDone':'Report approved','toast.saveDone':'Report saved','toast.gate1Done':'Gate1 review completed','toast.gate2Done':'Gate2 review completed','toast.taskCreated':'Task {{task}} created (review {{review}}) — jumped to Task Overview','action.finalToJira':'Final report → Jira','toast.reviewRef':'Review {{review}}',
+    'metric.tasks':'Review Tasks','metric.runs':'Gate Runs','metric.reports':'Reports','metric.approved':'Approved',
+    'dashboard.latestTasks':'Latest Review Tasks',
+    'spec.title':'Spec Files','spec.hint':'Upload documents or add existing files to the Gate inputs below','spec.files':'{{count}} files',
+    'table.code':'Code','table.productVersion':'Product / Version','table.flow':'Flow','table.updated':'Updated','table.reports':'Reports','table.file':'File','table.path':'Path','table.size':'Size','table.addToInput':'Add to Input','table.taskCode':'Task Code','table.taskName':'Task Name','table.flowResult':'Flow / Result','table.approvalTrigger':'Approval / Trigger','table.autoGate2':'Auto Gate2','table.final':'Final Report','table.action':'Action','table.name':'Name','table.categoryRisk':'Category / Risk','table.version':'Version','table.scenarios':'Scenarios','table.changedAt':'Changed At','table.versionChange':'Version Change','table.scenarioChange':'Scenario Count Change','table.changeSummary':'Change Summary','table.updatedBy':'Updated By','table.reason':'Change Reason','table.jsonPath':'JSON Path','table.changeType':'Type','table.before':'Before','table.after':'After',
+    'field.productName':'Product Name','field.productVersion':'Product Version','field.projectId':'Project ID','field.repository':'Repository','field.branch':'Branch','field.gate1Kb':'Gate1 Golden KB','field.autoGate2Kb':'Auto Gate2 Golden KB','field.threshold':'Match Threshold','field.triggeredBy':'Triggered By','field.existingTask':'Existing Task ID / Code','field.gate2Kb':'Gate2 Golden KB','field.gate1ReportPath':'Gate1 Report Path (optional: finds the latest report for the same task)','field.product':'Product','field.version':'Version','field.task':'Task','field.reviewId':'Review ID','field.reviewer':'Reviewer','field.reportContent':'Report Content','field.knowledgeBase':'Knowledge Base','field.updatedBy':'Updated By','field.reason':'Change Reason','field.kbJsonFile':'KB JSON File','field.kbId':'Knowledge Base ID','field.name':'Name','field.category':'Category','field.riskLevel':'Risk Level','field.description':'Description',
+    'source.gate1':'Gate1 Input Source','source.autoGate2':'Auto Gate2 Input Source','source.gate2':'Gate2 Input Source','source.docs':'Existing Files','source.paste':'Paste Content','source.both':'Combine Both','source.gate1Docs':'Gate1 Document Paths','source.gate1Paste':'Gate1 Pasted Content','source.autoGate2Docs':'Auto Gate2 Document Paths','source.autoGate2Paste':'Auto Gate2 Pasted Content','source.gate2Docs':'Gate2 Document Paths','source.gate2Paste':'Gate2 Pasted Content',
+    'placeholder.gate1':'Paste business requirements, user stories, or process descriptions','placeholder.autoGate2':'Optional content used when Gate2 runs automatically after Gate1 approval','placeholder.existingTask':'For example task-xxx or TASK-000001; optional','placeholder.gate2':'Paste architecture, API design, data model, or implementation plan','placeholder.kbDescription':'Golden knowledge base for cloud services',
+    'gate2.standaloneHint':'Leave both Task ID and Gate1 report empty to run an independent Gate2 review.',
+    'tasks.title':'Review Task Details','tasks.showing':'Showing','tasks.unit':'tasks','tasks.scrollHint':'Scroll horizontally to view all task details',
+    'tasks.tableView':'Full field table','tasks.filterPanel':'Filter by product / version / task',
+    'flow.all':'All','flow.running':'In progress','flow.approval':'Awaiting approval','flow.done':'Completed','flow.failed':'Failed',
+    'stage.gate1':'Gate1 review','stage.gate1Approval':'Gate1 approval','stage.gate2':'Gate2 review','stage.gate2Approval':'Gate2 approval',
+    'reports.title':'Report Review & Approval','kb.title':'Golden Knowledge Base','kb.uploadTitle':'Upload Golden Knowledge Base','kb.catalog':'Knowledge Base Catalog','kb.historyTitle':'Change Records','kb.historyUnit':'records','kb.historyDetail':'Change Details','kb.addedScenarios':'Added Scenarios','kb.modifiedScenarios':'Modified Scenarios','kb.removedScenarios':'Removed Scenarios','kb.changedFields':'Other Changed Fields','kb.fieldChangeDetails':'Field-level JSON Changes','kb.fieldCount':'Fields {{count}}','kb.moreChanges':'{{count}} more','kb.previousSnapshot':'Previous Snapshot','kb.newSnapshot':'New Snapshot','kb.none':'None',
+    'change.added':'Added','change.modified':'Modified','change.removed':'Removed',
+    'action.runGate1':'Run Gate1','action.runGate2':'Run Gate2','action.filter':'Filter','action.showAll':'Show All','action.view':'View','action.download':'Download','action.loadEdit':'Load for Editing','action.saveChanges':'Save Changes','action.approve':'Approve','action.sendJira':'Send to Jira','action.refreshCatalog':'Refresh Catalog','action.loadKb':'Load KB','action.saveKb':'Save KB','action.history':'Change History','action.uploadKb':'Upload KB','action.load':'Load','action.viewDetails':'View Details','action.closeDetails':'Close Details','action.approveGate1':'Approve G1','action.approveGate2':'Approve G2','action.retryGate2':'Retry G2',
+    'filter.allProducts':'All Products','filter.allVersions':'All Versions','filter.allTasks':'All Tasks',
+    'link.view':'View','link.download':'Download','link.final':'Final',
+    'task.started':'Started','task.trigger':'Triggered by',
+    'message.noTasks':'No tasks','message.noMatchingTasks':'No tasks match the current filters','message.noSpecs':'No Spec files','message.noKbs':'No knowledge bases','message.noKbHistory':'No change records for this knowledge base','message.noFieldChanges':'No field-level changes','message.loadingKbHistory':'Loading change records…','message.kbHistoryLoadFailed':'Failed to load change records: {{error}}','message.kbHistoryDetailFailed':'Failed to load change details: {{error}}','message.noPreviousSnapshot':'Initial creation; no previous snapshot','message.healthFailed':'Health check failed: {{error}}','message.initFailed':'Initialization failed: {{error}}','message.selectReview':'Select a report first.','message.loaded':'Loaded.','message.failed':'Operation failed.','message.invalidJson':'Invalid JSON: {{error}}','message.selectSpec':'Select Spec files to upload.','message.specListFailed':'Failed to load Spec files: {{error}}','message.specAdded':'Added {{path}}','message.uploadFailed':'Upload failed: {{error}}','message.selectKbFile':'Select a KB JSON file to upload.','message.kbIdRequired':'Knowledge Base ID is required.','message.kbCatalogFailed':'Failed to load knowledge base catalog: {{error}}','message.jiraMissing':'Jira is not configured. Set these values in .env: {{fields}}','message.jiraMissingTitle':'Jira is not configured; required: {{fields}}','message.jiraSending':'Sending {{review}} to Jira…','message.jiraFailed':'Failed to send to Jira: {{error}}','message.taskSelected':'Selected {{task}}. Open Report Review & Approval to continue.','message.emptyInput':'{{label}} is set to “{{mode}}”, but there is no content to submit.',
+    'language.switch':'切换为中文'
+  }
+};
+let currentLanguage=localStorage.getItem('ai-gate-language')==='en'?'en':'zh';
+function t(key,vars={}){let text=I18N[currentLanguage]?.[key]??I18N.zh[key]??key;Object.entries(vars).forEach(([name,value])=>{text=text.replaceAll(`{{${name}}}`,String(value));});return text;}
+function applyTranslations(){document.documentElement.lang=currentLanguage==='zh'?'zh-CN':'en';document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t(el.dataset.i18n);});document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{el.placeholder=t(el.dataset.i18nPlaceholder);});document.querySelectorAll('.segmented button').forEach(el=>{el.title=el.textContent.trim();});const activeNav=document.querySelector('.nav button.active');if(activeNav)byId('pageTitle').textContent=activeNav.textContent.trim();const button=byId('langToggle'),label=byId('langToggleText'),menu=byId('menuToggle'),close=byId('navClose');if(label)label.textContent=currentLanguage==='zh'?'English':'中文';if(button){button.title=t('language.switch');button.setAttribute('aria-label',t('language.switch'));}if(menu){menu.title=t('nav.open');menu.setAttribute('aria-label',t('nav.open'));}if(close){close.title=t('nav.close');close.setAttribute('aria-label',t('nav.close'));}}
+function rerenderLocalizedContent(){initInputSources();if(state.catalog){fillFilters();fillReportTaskSelect();loadTasks();}renderSpecs();renderKbCatalog();renderKbHistory();renderKbHistoryDetail();loadStats().catch(()=>{});loadJiraSettings();health();}
+function setLanguage(language){if(!I18N[language]||language===currentLanguage)return;currentLanguage=language;localStorage.setItem('ai-gate-language',language);applyTranslations();rerenderLocalizedContent();}
+function toggleLanguage(){setLanguage(currentLanguage==='zh'?'en':'zh');}
+const state={catalog:null,tasks:[],specs:[],kbs:{gate1:[],gate2:[]},kbHistory:[],kbHistoryDetail:null,kbHistoryLoadedKey:'',kbHistoryLoading:false,jira:null,inputSources:{g1:'docs',g1Gate2:'docs',g2:'docs'},selectedTask:'',selectedReview:'',statusFilter:'all'};
+const ACTIVE_AUTO_GATE2_STATUSES=new Set(['queued','running']);
+let workflowPollTimer=null;
+let workflowPollInFlight=false;
+let kbHistoryRequestId=0;
 const byId=id=>document.getElementById(id);
 const lines=id=>byId(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+const inlineDocs=(id,name)=>{const content=byId(id).value.trim();return content?[{name,content}]:[];};
+const sourceFields={g1:{docs:'g1Docs',paste:'g1Text'},g1Gate2:{docs:'g1Gate2Docs',paste:'g1Gate2Text'},g2:{docs:'g2Docs',paste:'g2Text'}};
+const sourceModeKey={docs:'source.docs',paste:'source.paste',both:'source.both'};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const HUMAN_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
 function isTimestampKey(key){return /(^|_)(created|updated|approved|completed|triggered|reviewed|generated|started|ended)_?at$|(^|_)(time|timestamp)$/i.test(String(key||''));}
 function parseTimestamp(value){if(value===null||value===undefined||value==='')return null;if(value instanceof Date)return Number.isNaN(value.getTime())?null:value;if(typeof value==='number'){const d=new Date(value>100000000000?value:value*1000);return Number.isNaN(d.getTime())?null:d;}if(typeof value!=='string')return null;const text=value.trim();if(!text)return null;if(/^\d{14}$/.test(text)){const d=new Date(`${text.slice(0,4)}-${text.slice(4,6)}-${text.slice(6,8)}T${text.slice(8,10)}:${text.slice(10,12)}:${text.slice(12,14)}`);return Number.isNaN(d.getTime())?null:d;}if(/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/.test(text)){const normalized=/Z$|[+-]\d{2}:?\d{2}$/.test(text)?text:text.replace(' ','T');const d=new Date(normalized);return Number.isNaN(d.getTime())?null:d;}return null;}
-function formatDateTime(value){const d=parseTimestamp(value);return d?HUMAN_TIME_FORMATTER.format(d).replace(/\//g,'-'):String(value??'');}
+function formatDateTime(value){const d=parseTimestamp(value);if(!d)return String(value??'');const locale=currentLanguage==='zh'?'zh-CN':'en-GB';return new Intl.DateTimeFormat(locale,{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d).replace(/\//g,'-');}
 function formatForDisplay(value,key=''){if(Array.isArray(value))return value.map(item=>formatForDisplay(item));if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,formatForDisplay(v,k)]));if(isTimestampKey(key)){const d=parseTimestamp(value);if(d)return formatDateTime(d);}return value;}
 const show=(id,data)=>byId(id).textContent=typeof data==='string'?data:JSON.stringify(formatForDisplay(data),null,2);
+const TOAST_ICONS={ok:'\u2713',error:'\u2715',warn:'\u26a0',info:'\u2139'};
+function dismissToast(el){if(!el||el.classList.contains('closing'))return;el.classList.add('closing');setTimeout(()=>el.remove(),200);}
+function notify(kind,title,detail='',options={}){const host=byId('toastHost');if(!host)return null;const type=['ok','error','warn','info'].includes(kind)?kind:'info';const el=document.createElement('div');el.className=`toast ${type}`;const link=options.link?`<div class="toastText"><a target="_blank" rel="noopener noreferrer" href="${esc(options.link)}">${esc(options.linkText||options.link)}</a></div>`:'';el.innerHTML=`<span class="toastIcon" aria-hidden="true">${TOAST_ICONS[type]}</span><div class="toastBody"><div class="toastTitle">${esc(title)}</div>${detail?`<div class="toastText">${esc(detail)}</div>`:''}${link}</div><button class="toastClose" type="button" aria-label="${esc(t('toast.close'))}">\u00d7</button>`;el.querySelector('.toastClose').addEventListener('click',()=>dismissToast(el));host.appendChild(el);while(host.children.length>4)host.firstElementChild.remove();const timeout=options.timeout??(type==='error'?9000:type==='info'?4000:6000);if(timeout>0)setTimeout(()=>dismissToast(el),timeout);return el;}
+function setReportStatus(kind,title,detail='',options={}){const strip=byId('reportStatus');if(!strip)return;const type=['ok','error','warn','info'].includes(kind)?kind:'info';strip.className=`statusStrip visible ${type}`;byId('reportStatusIcon').textContent=TOAST_ICONS[type];byId('reportStatusTitle').textContent=title;const detailEl=byId('reportStatusDetail');detailEl.textContent=detail;if(options.link){const a=document.createElement('a');a.target='_blank';a.rel='noopener noreferrer';a.href=options.link;a.textContent=options.linkText||options.link;detailEl.append(detail?' ':'',a);}}
+async function guard(action,failedTitle){try{return await action();}catch(e){notify('error',failedTitle||t('toast.failed'),e.message);throw e;}}
 async function fetchJson(url,opts={}){const r=await fetch(url,opts);const d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d;}
-function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));byId(id).classList.add('active');btn.classList.add('active');byId('pageTitle').textContent=btn.textContent;if(id==='taskList')loadTasks();if(id==='reports')fillReportTaskSelect();if(id==='dashboard')loadStats();}
-async function health(){try{show('healthOut',await fetchJson('/api/v1/health'));}catch(e){show('healthOut',e.message)}}
-async function refreshAll(){await loadCatalog();await loadSpecs();await loadStats();await loadTasks();}
-async function loadStats(){const s=await fetchJson('/api/v1/dashboard/stats');byId('mTask').textContent=s.task_count||0;byId('mActivity').textContent=s.activity_count||0;byId('mReport').textContent=s.report_count||0;byId('mApproved').textContent=s.approved_count||0;byId('latestTasksBody').innerHTML=(s.latest_tasks||[]).map(taskRowCompact).join('')||'<tr><td colspan="5" class="muted">No tasks</td></tr>';}
-async function loadCatalog(){state.catalog=await fetchJson('/api/v1/catalog');state.tasks=state.catalog.tasks||[];fillFilters();fillReportTaskSelect();}
+function setInputSource(group,mode){state.inputSources[group]=mode;updateInputSource(group);}
+function updateInputSource(group){const mode=state.inputSources[group]||'docs',fields=sourceFields[group];document.querySelectorAll(`[data-source-group="${group}"] button`).forEach(btn=>btn.classList.toggle('active',btn.dataset.sourceMode===mode));['docs','paste'].forEach(kind=>{const panel=document.querySelector(`[data-source-panel="${group}-${kind}"]`),el=byId(fields[kind]);const disabled=(mode==='docs'&&kind==='paste')||(mode==='paste'&&kind==='docs');if(panel)panel.classList.toggle('disabled',disabled);if(el)el.disabled=disabled;});}
+function initInputSources(){Object.keys(sourceFields).forEach(updateInputSource);}
+function selectedInputPayload(group,docsId,pasteId,pasteName,outId,labelKey){const mode=state.inputSources[group]||'docs',documents=mode==='paste'?[]:lines(docsId),documentTexts=mode==='docs'?[]:inlineDocs(pasteId,pasteName);if(!documents.length&&!documentTexts.length){show(outId,t('message.emptyInput',{label:t(labelKey),mode:t(sourceModeKey[mode])}));return null;}return {documents,document_texts:documentTexts};}
+function activeTabId(){return document.querySelector('.tab.active')?.id||'';}
+function hasActiveWorkflow(){return state.tasks.some(item=>ACTIVE_AUTO_GATE2_STATUSES.has(item.auto_gate2?.status));}
+function workflowPollDelay(){if(document.hidden)return hasActiveWorkflow()?15000:null;if(hasActiveWorkflow())return 3000;return ['taskList','reports'].includes(activeTabId())?10000:null;}
+function updateWorkflowPolling(){if(workflowPollTimer)clearTimeout(workflowPollTimer);workflowPollTimer=null;const delay=workflowPollDelay();if(delay!==null&&!workflowPollInFlight)workflowPollTimer=setTimeout(pollWorkflow,delay);}
+async function pollWorkflow(){workflowPollTimer=null;if(workflowPollInFlight)return updateWorkflowPolling();workflowPollInFlight=true;try{await loadCatalog();const tab=activeTabId();if(tab==='taskList'){await loadTasks();await loadStats();}}catch(e){console.error('Workflow refresh failed',e);}finally{workflowPollInFlight=false;updateWorkflowPolling();}}
+document.addEventListener('visibilitychange',updateWorkflowPolling);
+function setNavOpen(open){const sidebar=byId('sidebar'),scrim=byId('navScrim'),toggle=byId('menuToggle'),isOpen=Boolean(open);sidebar?.classList.toggle('open',isOpen);scrim?.classList.toggle('open',isOpen);document.body.classList.toggle('navOpen',isOpen);toggle?.setAttribute('aria-expanded',String(isOpen));if(isOpen)sidebar?.querySelector('.nav button.active')?.focus();else if(document.activeElement===byId('navClose'))toggle?.focus();}
+function showTab(id,btn){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>{x.classList.remove('active');x.removeAttribute('aria-current');});byId(id).classList.add('active');btn.classList.add('active');btn.setAttribute('aria-current','page');byId('pageTitle').textContent=btn.textContent;setNavOpen(false);if(id==='taskList')loadCatalog().then(loadTasks).then(loadStats).catch(e=>show('taskOut',e.message));if(id==='reports')loadCatalog().catch(e=>show('reportOut',e.message));if(id==='kb')loadKbCatalogs();updateWorkflowPolling();}
+document.addEventListener('keydown',event=>{if(event.key==='Escape')setNavOpen(false);});
+window.addEventListener('resize',()=>{if(window.innerWidth>900)setNavOpen(false);});
+async function health(){const el=byId('healthBadge');try{const d=await fetchJson('/api/v1/health');const ok=d.status==='ok';el.textContent=t(ok?'status.ok':'status.error');el.className='badge '+(ok?'ok':'danger');}catch(e){el.textContent=t('status.unreachable');el.className='badge danger';show('healthOut',t('message.healthFailed',{error:e.message}));}}
+async function loadJiraSettings(){try{state.jira=await fetchJson('/api/v1/integrations/jira');}catch(e){state.jira={configured:false,missing:[]};}const btn=byId('jiraBtn');if(btn)btn.title=state.jira.configured?`${t('action.sendJira')}: ${state.jira.base_url} / ${state.jira.project_key}`:t('message.jiraMissingTitle',{fields:(state.jira.missing||[]).join(currentLanguage==='zh'?'、':', ')});}
+async function jiraSend(url,label,outId){const fields=(state.jira?.missing||[]).join(currentLanguage==='zh'?'、':', ');if(state.jira&&!state.jira.configured){const message=t('message.jiraMissing',{fields});notify('warn',t('jira.notConfigured'),message);if(outId==='reportOut')setReportStatus('warn',t('jira.notConfigured'),message);return show(outId,message);}const btn=byId('jiraBtn');if(outId==='reportOut'){setReportStatus('info',t('jira.sending'),t('jira.sendingDetail',{review:label}));if(btn)btn.disabled=true;}show(outId,t('message.jiraSending',{review:label}));try{const d=await fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});show(outId,d);const key=d.issue_key||'',link=d.issue_url||'',attachFailed=Boolean(d.attachment_error);const kind=attachFailed?'warn':'ok';const title=attachFailed?t('jira.attachFailed'):t('jira.created');const detail=attachFailed?`${key} - ${d.attachment_error}`:t('jira.createdDetail',{key});notify(kind,title,detail,{link,linkText:key||t('jira.openIssue')});if(outId==='reportOut')setReportStatus(kind,title,detail,{link,linkText:key||t('jira.openIssue')});}catch(e){const message=t('message.jiraFailed',{error:e.message});show(outId,message);notify('error',t('jira.failedTitle'),e.message);if(outId==='reportOut')setReportStatus('error',t('jira.failedTitle'),e.message);}finally{if(btn)btn.disabled=false;}}
+function pushToJira(reviewId,outId){if(!reviewId){notify('warn',t('message.selectReview'));return show(outId,t('message.selectReview'));}return jiraSend(`/api/v1/reports/${encodeURIComponent(reviewId)}/jira`,reviewId,outId);}
+function sendReportToJira(){return pushToJira(currentReview(),'reportOut');}
+function sendReviewToJira(reviewId){return pushToJira(reviewId,'taskOut');}
+function sendFinalReportToJira(taskId,outId='taskOut'){const item=state.tasks.find(task=>task.task_id===taskId);return jiraSend(`/api/v1/tasks/${encodeURIComponent(taskId)}/final-report/jira`,item?.task_code||taskId,outId);}
+async function refreshAll(){await loadCatalog();await loadSpecs();await loadKbCatalogs();await loadStats();await loadTasks();await loadJiraSettings();await health();}
+async function loadStats(){const s=await fetchJson('/api/v1/dashboard/stats');byId('mTask').textContent=s.task_count||0;byId('mActivity').textContent=s.activity_count||0;byId('mReport').textContent=s.report_count||0;byId('mApproved').textContent=s.approved_count||0;}
+async function loadCatalog(){state.catalog=await fetchJson('/api/v1/catalog');state.tasks=state.catalog.tasks||[];fillFilters();fillReportTaskSelect();updateWorkflowPolling();}
 function formatBytes(size){const n=Number(size||0);if(n<1024)return `${n} B`;if(n<1024*1024)return `${(n/1024).toFixed(1)} KB`;return `${(n/1024/1024).toFixed(1)} MB`;}
-function appendSpecPath(targetId,path){const el=byId(targetId),docs=lines(targetId);if(!docs.includes(path)){docs.push(path);el.value=docs.join('\n');}show('specOut',`已加入 ${path}`);}
-function renderSpecs(){const body=byId('specsBody');if(!body)return;body.innerHTML=(state.specs||[]).map(item=>`<tr><td>${esc(item.filename)}</td><td><code>${esc(item.path)}</code></td><td>${esc(formatBytes(item.size))}</td><td>${esc(formatDateTime(item.updated_at||''))}</td><td><button class="secondary inline" onclick="appendSpecPath('g1Docs','${esc(item.path)}')">Gate1</button><button class="secondary inline" onclick="appendSpecPath('g1Gate2Docs','${esc(item.path)}')">Gate1→Gate2</button><button class="secondary inline" onclick="appendSpecPath('g2Docs','${esc(item.path)}')">Gate2</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No spec files</td></tr>';}
-async function loadSpecs(){try{const d=await fetchJson('/api/v1/specs');state.specs=d.items||[];renderSpecs();}catch(e){show('specOut','Spec 列表加载失败: '+e.message);}}
-async function uploadSpecs(){const input=byId('specUpload'),files=[...(input.files||[])];if(!files.length)return show('specOut','请选择要上传的 spec 文件。');const form=new FormData();files.forEach(file=>form.append('files',file));try{const r=await fetch('/api/v1/specs/upload',{method:'POST',body:form}),d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));input.value='';show('specOut',d);await loadSpecs();}catch(e){show('specOut','上传失败: '+e.message);}}
+function appendSpecPath(targetId,path){const el=byId(targetId),docs=lines(targetId);if(!docs.includes(path)){docs.push(path);el.value=docs.join('\n');}show('specOut',t('message.specAdded',{path}));}
+function renderSpecs(){const body=byId('specsBody');if(!body)return;const items=state.specs||[];const count=byId('specCount');if(count)count.textContent=t('spec.files',{count:items.length});body.innerHTML=items.map(item=>`<tr><td>${esc(item.filename)}</td><td><code>${esc(item.path)}</code></td><td>${esc(formatBytes(item.size))}</td><td>${esc(formatDateTime(item.updated_at||''))}</td><td><div class="tableActions"><button class="secondary inline" onclick="appendSpecPath('g1Docs','${esc(item.path)}')">Gate1</button><button class="secondary inline" onclick="appendSpecPath('g1Gate2Docs','${esc(item.path)}')">Gate1→Gate2</button><button class="secondary inline" onclick="appendSpecPath('g2Docs','${esc(item.path)}')">Gate2</button></div></td></tr>`).join('')||`<tr><td colspan="5" class="muted">${t('message.noSpecs')}</td></tr>`;}
+async function loadSpecs(){try{const d=await fetchJson('/api/v1/specs');state.specs=d.items||[];renderSpecs();}catch(e){show('specOut',t('message.specListFailed',{error:e.message}));}}
+async function uploadSpecs(){const input=byId('specUpload'),files=[...(input.files||[])];if(!files.length)return show('specOut',t('message.selectSpec'));const form=new FormData();files.forEach(file=>form.append('files',file));try{const r=await fetch('/api/v1/specs/upload',{method:'POST',body:form}),d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));input.value='';show('specOut',d);await loadSpecs();}catch(e){show('specOut',t('message.uploadFailed',{error:e.message}));}}
+function kbLabel(item){return `${item.knowledge_base_id} - ${item.name||''} (${item.category||'General'} / ${item.risk_level||''})`;}
+function fillKbSelect(id,gate,selected='default'){const el=byId(id);if(!el)return;const items=state.kbs[gate]||[];el.innerHTML='';items.forEach(item=>{const o=document.createElement('option');o.value=item.knowledge_base_id;o.textContent=kbLabel(item);el.appendChild(o);});if(!items.some(item=>item.knowledge_base_id==='default')){const o=document.createElement('option');o.value='default';o.textContent='default';el.prepend(o);}if(selected&&[...el.options].some(o=>o.value===selected))el.value=selected;}
+function fillKbSelectors(){fillKbSelect('g1Kb','gate1',byId('g1Kb')?.value||'default');fillKbSelect('g1Gate2Kb','gate2',byId('g1Gate2Kb')?.value||'default');fillKbSelect('g2Kb','gate2',byId('g2Kb')?.value||'default');fillKbSelect('kbId',byId('kbGate')?.value||'gate1',byId('kbId')?.value||'default');}
+function renderKbCatalog(){const gate=byId('kbGate')?.value||'gate1',body=byId('kbCatalogBody');if(!body)return;const items=state.kbs[gate]||[];body.innerHTML=items.map(item=>`<tr><td><code>${esc(item.knowledge_base_id)}</code></td><td>${esc(item.name)}</td><td>${esc(item.category)}<br><span class="badge warn">${esc(item.risk_level)}</span></td><td>${esc(item.version||'')}</td><td>${esc(item.scenario_count)}</td><td><button class="secondary inline" onclick="selectKb('${esc(gate)}','${esc(item.knowledge_base_id)}')">${t('action.load')}</button></td></tr>`).join('')||`<tr><td colspan="6" class="muted">${t('message.noKbs')}</td></tr>`;}
+function setKbHistoryStatus(message='',isError=false){const el=byId('kbHistoryStatus');if(!el)return;el.textContent=message;el.className=`historyStatus small ${isError?'error':'muted'}`;}
+function historyFieldChanges(summary={}){return Array.isArray(summary.field_changes)?summary.field_changes:[];}
+function historyChangeBadges(summary={}){const added=Array.isArray(summary.added_scenario_ids)?summary.added_scenario_ids.length:0,modified=Array.isArray(summary.modified_scenario_ids)?summary.modified_scenario_ids.length:0,removed=Array.isArray(summary.removed_scenario_ids)?summary.removed_scenario_ids.length:0,fields=Number(summary.field_change_count??historyFieldChanges(summary).length)||0;return `<div class="historyChangeBadges"><span class="changeBadge added" title="${esc(t('kb.addedScenarios'))}">+${added}</span><span class="changeBadge modified" title="${esc(t('kb.modifiedScenarios'))}">~${modified}</span><span class="changeBadge removed" title="${esc(t('kb.removedScenarios'))}">-${removed}</span><span class="changeBadge fields">${esc(t('kb.fieldCount',{count:fields}))}</span></div>`;}
+function historyFieldPaths(summary={}){const changes=historyFieldChanges(summary);if(!changes.length)return '';const visible=changes.slice(0,2),remaining=changes.length-visible.length;return `<div class="historyPaths">${visible.map(change=>`<span class="historyPath" title="${esc(change.path||'')}">${esc(change.path||'')}</span>`).join('')}${remaining?`<span class="small muted">${esc(t('kb.moreChanges',{count:remaining}))}</span>`:''}</div>`;}
+function renderKbHistory(){const body=byId('kbHistoryBody'),count=byId('kbHistoryCount');if(!body)return;const items=state.kbHistory||[],selectedId=state.kbHistoryDetail?.history_id||'';if(count)count.textContent=items.length;body.innerHTML=items.map(item=>{const previousVersion=item.previous_version||'—',previousCount=item.previous_scenario_count??0,newCount=item.new_scenario_count??0,selected=item.history_id===selectedId?' class="selected"':'',summary=item.change_summary||{};return `<tr${selected}><td>${esc(formatDateTime(item.changed_at||''))}</td><td class="historyVersion"><span class="muted">${esc(previousVersion)}</span> → <b>${esc(item.version||'')}</b></td><td><span class="small muted">${t('table.scenarios')}:</span> <b>${esc(previousCount)} → ${esc(newCount)}</b>${historyChangeBadges(summary)}${historyFieldPaths(summary)}</td><td>${esc(item.updated_by||'')}</td><td><span class="historyReason" title="${esc(item.change_reason||'')}">${esc(item.change_reason||'')}</span></td><td>${item.history_id?`<button class="secondary inline" data-history-id="${esc(item.history_id)}" onclick="viewKbHistoryDetail(this.dataset.historyId)">${t('action.viewDetails')}</button>`:'-'}</td></tr>`;}).join('')||`<tr><td colspan="6" class="muted">${t('message.noKbHistory')}</td></tr>`;}
+function historyTokens(values){const items=Array.isArray(values)?values:[];return items.length?items.map(value=>`<span class="historyToken">${esc(value)}</span>`).join(''):`<span class="small muted">${t('kb.none')}</span>`;}
+function historyFieldValue(value,exists){if(!exists)return '<span class="small muted">—</span>';const formatted=JSON.stringify(formatForDisplay(value),null,2);return `<pre class="historyValue">${esc(formatted===undefined?String(value):formatted)}</pre>`;}
+function renderKbHistoryFieldChanges(summary={}){const body=byId('kbHistoryFieldChanges');if(!body)return;const changes=historyFieldChanges(summary);body.innerHTML=changes.map(change=>{const type=['added','modified','removed'].includes(change.change_type)?change.change_type:'modified',hasPrevious=Object.prototype.hasOwnProperty.call(change,'previous_value'),hasNew=Object.prototype.hasOwnProperty.call(change,'new_value');return `<tr><td><code>${esc(change.path||'')}</code></td><td><span class="changeBadge ${type}">${esc(t(`change.${type}`))}</span></td><td>${historyFieldValue(change.previous_value,hasPrevious)}</td><td>${historyFieldValue(change.new_value,hasNew)}</td></tr>`;}).join('')||`<tr><td colspan="4" class="muted">${t('message.noFieldChanges')}</td></tr>`;}
+function renderKbHistoryDetail(){const container=byId('kbHistoryDetail');if(!container)return;const item=state.kbHistoryDetail;if(!item){container.hidden=true;return;}container.hidden=false;byId('kbHistoryDetailId').textContent=item.history_id||'';const previousVersion=item.previous_version||'—',previousCount=item.previous_scenario_count??0,newCount=item.new_scenario_count??0;const metadata=[["Gate",item.gate],[t('field.knowledgeBase'),item.knowledge_base_id],[t('table.versionChange'),`${previousVersion} → ${item.version||''}`],[t('table.scenarioChange'),`${previousCount} → ${newCount}`],[t('table.updatedBy'),item.updated_by],[t('table.changedAt'),formatDateTime(item.changed_at||'')],[t('table.reason'),item.change_reason]];byId('kbHistoryMeta').innerHTML=metadata.map(([label,value])=>`<div class="historyMetaItem"><span>${esc(label)}</span><strong>${esc(value||'—')}</strong></div>`).join('');const summary=item.change_summary||{},groups=[[t('kb.addedScenarios'),summary.added_scenario_ids],[t('kb.modifiedScenarios'),summary.modified_scenario_ids],[t('kb.removedScenarios'),summary.removed_scenario_ids],[t('kb.changedFields'),summary.changed_fields]];byId('kbHistoryChanges').innerHTML=groups.map(([label,values])=>`<div class="historyChangeGroup"><h4>${esc(label)}</h4><div class="historyTokens">${historyTokens(values)}</div></div>`).join('');renderKbHistoryFieldChanges(summary);byId('kbPreviousSnapshot').textContent=item.previous_snapshot===null||item.previous_snapshot===undefined?t('message.noPreviousSnapshot'):JSON.stringify(formatForDisplay(item.previous_snapshot),null,2);byId('kbNewSnapshot').textContent=JSON.stringify(formatForDisplay(item.new_snapshot||{}),null,2);}
+function selectedKbHistoryKey(){return `${byId('kbGate')?.value||'gate1'}:${byId('kbId')?.value||'default'}`;}
+function resetKbHistory(){kbHistoryRequestId+=1;state.kbHistory=[];state.kbHistoryDetail=null;state.kbHistoryLoadedKey='';state.kbHistoryLoading=false;renderKbHistory();renderKbHistoryDetail();setKbHistoryStatus();}
+function onKbHistoryToggle(){const panel=byId('kbHistoryPanel');if(panel?.open&&!state.kbHistoryLoading&&state.kbHistoryLoadedKey!==selectedKbHistoryKey())loadKbHistory({scroll:false});}
+async function viewKbHistoryDetail(historyId){const gate=byId('kbGate').value,key=selectedKbHistoryKey();setKbHistoryStatus(t('message.loadingKbHistory'));try{const detail=await fetchJson(`/api/v1/knowledge-base/${gate}/history/${encodeURIComponent(historyId)}`);if(key!==selectedKbHistoryKey())return;state.kbHistoryDetail=detail;renderKbHistory();renderKbHistoryDetail();setKbHistoryStatus();byId('kbHistoryDetail').scrollIntoView({block:'nearest'});}catch(e){if(key===selectedKbHistoryKey())setKbHistoryStatus(t('message.kbHistoryDetailFailed',{error:e.message}),true);}}
+function closeKbHistoryDetail(){state.kbHistoryDetail=null;renderKbHistory();renderKbHistoryDetail();}
+async function loadKbCatalog(gate){try{const d=await fetchJson(`/api/v1/knowledge-base/${gate}/catalog`);state.kbs[gate]=d.items||[];fillKbSelectors();renderKbCatalog();return d;}catch(e){show('kbOut',t('message.kbCatalogFailed',{error:e.message}));return {items:[]};}}
+async function loadKbCatalogs(){await Promise.all(['gate1','gate2'].map(loadKbCatalog));fillKbSelectors();renderKbCatalog();}
+function onKbGateChange(){const historyWasOpen=byId('kbHistoryPanel')?.open;fillKbSelect('kbId',byId('kbGate').value,'default');renderKbCatalog();resetKbHistory();if(historyWasOpen)loadKbHistory({scroll:false});}
+function onKbSelectionChange(){const historyWasOpen=byId('kbHistoryPanel')?.open;resetKbHistory();if(historyWasOpen)loadKbHistory({scroll:false});}
+async function selectKb(gate,id){const historyWasOpen=byId('kbHistoryPanel')?.open;byId('kbGate').value=gate;fillKbSelect('kbId',gate,id);byId('kbId').value=id;renderKbCatalog();resetKbHistory();await loadKb();if(historyWasOpen)await loadKbHistory({scroll:false});}
+async function uploadKb(){const gate=byId('kbGate').value,input=byId('kbUpload'),file=input.files&&input.files[0];if(!file)return show('kbOut',t('message.selectKbFile'));const kbId=byId('kbUploadId').value.trim();if(!kbId)return show('kbOut',t('message.kbIdRequired'));const form=new FormData();form.append('file',file);form.append('knowledge_base_id',kbId);form.append('updated_by',byId('kbUpdatedBy').value);form.append('change_reason',byId('kbReason').value||'Uploaded from UI');form.append('version',byId('kbVersion').value);form.append('name',byId('kbUploadName').value);form.append('category',byId('kbUploadCategory').value);form.append('risk_level',byId('kbUploadRisk').value);form.append('description',byId('kbUploadDescription').value);try{const r=await fetch(`/api/v1/knowledge-base/${gate}/upload`,{method:'POST',body:form}),d=await r.json();if(!r.ok)throw new Error(d.detail||JSON.stringify(d));input.value='';show('kbOut',d);await loadKbCatalog(gate);if(d.item?.knowledge_base_id)await selectKb(gate,d.item.knowledge_base_id);if(!byId('kbHistoryPanel').open)await loadKbHistory({scroll:false});}catch(e){show('kbOut',t('message.uploadFailed',{error:e.message}));}}
 function products(){return [...new Set(state.tasks.map(t=>t.product_name).filter(Boolean))];}
 function versions(product){return [...new Set(state.tasks.filter(t=>!product||t.product_name===product).map(t=>t.product_version).filter(Boolean))];}
 function fillSelect(id,items,selected,label=x=>x,value=x=>x){const el=byId(id);el.innerHTML='';items.forEach(it=>{const o=document.createElement('option');o.value=value(it);o.textContent=label(it);el.appendChild(o);});if(selected&&[...el.options].some(o=>o.value===selected))el.value=selected;}
-function fillFilters(){fillSelect('filterProduct',[''].concat(products()),'',x=>x||'All Products');fillSelect('filterVersion',[''].concat(versions('')),'',x=>x||'All Versions');fillSelect('filterTask',[{task_id:'',task_code:'All Tasks'}].concat(state.tasks),'',t=>t.task_id?`${t.task_code||''} ${t.task_name||t.task_id}`:'All Tasks',t=>t.task_id);}
+function fillFilters(){const selectedProduct=byId('filterProduct')?.value||'',selectedVersion=byId('filterVersion')?.value||'',selectedTask=byId('filterTask')?.value||'';fillSelect('filterProduct',[''].concat(products()),selectedProduct,value=>value||t('filter.allProducts'));fillSelect('filterVersion',[''].concat(versions(selectedProduct)),selectedVersion,value=>value||t('filter.allVersions'));fillSelect('filterTask',[{task_id:'',task_code:t('filter.allTasks')}].concat(state.tasks),selectedTask,item=>item.task_id?`${item.task_code||''} ${item.task_name||item.task_id}`:t('filter.allTasks'),item=>item.task_id);}
 function fillReportTaskSelect(){fillSelect('reportTask',state.tasks,state.selectedTask,t=>`${t.task_code||''} ${t.product_name||''} ${t.product_version||''}`,t=>t.task_id);onReportTaskChange();}
-function taskRowCompact(t){return `<tr><td><a href="#" onclick="selectTask('${esc(t.task_id)}');return false;">${esc(t.task_code||t.task_id)}</a></td><td>${esc(t.product_name)}<br><span class="muted small">${esc(t.product_version)}</span></td><td>${esc(t.flow_status||t.status)}</td><td>${esc(formatDateTime(t.updated_at||''))}</td><td>${reportLinks(t,'gate1')} ${reportLinks(t,'gate2')}</td></tr>`;}
-function reportLinks(t,gate){const url=t[`latest_${gate}_report_url`], dl=t[`latest_${gate}_download_url`];return url?`<span class="badge ${gate==='gate1'?'ok':'warn'}">${gate}</span> <a target="_blank" href="${esc(url)}">View</a>/<a target="_blank" href="${esc(dl)}">Download</a><br>`:`<span class="badge">${gate}: -</span><br>`;}
-async function loadTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(t=>t.product_name===p);if(v)rows=rows.filter(t=>t.product_version===v);if(tid)rows=rows.filter(t=>t.task_id===tid);byId('tasksBody').innerHTML=rows.map(taskRowFull).join('')||'<tr><td colspan="10" class="muted">No tasks</td></tr>';show('taskOut',{count:rows.length});}
-function taskRowFull(t){const a=t.approval||{},ag=t.auto_gate2||{};return `<tr><td>#${esc(t.task_serial_no||'')}<br><b>${esc(t.task_code||'')}</b><br><span class="small muted">${esc(t.task_id)}</span></td><td>${esc(t.product_name)}<br>${esc(t.product_version)}</td><td>${esc(t.task_name)}</td><td><b>${esc(t.flow_status)}</b><br><span class="muted small">${esc(t.final_result)}</span></td><td>${reportLinks(t,'gate1')}<span class="small">${esc(t.latest_gate1_review_id||'')}</span></td><td>${reportLinks(t,'gate2')}<span class="small">${esc(t.latest_gate2_review_id||'')}</span></td><td>trigger: ${esc(t.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${esc(ag.status||'')}<br><span class="small muted">${esc(formatDateTime(ag.triggered_at||ag.completed_at||''))}</span><br><span class="small muted">${esc(ag.gate2_review_id||'')}</span></td><td>${finalLinks(t)}</td><td><button class="secondary inline" onclick="selectTask('${esc(t.task_id)}')">Select</button>${t.latest_gate1_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate1_review_id)}')">Approve G1</button>`:''}${t.latest_gate2_review_id?`<button class="ok inline" onclick="approveReview('${esc(t.latest_gate2_review_id)}')">Approve G2</button>`:''}</td></tr>`;}
-function finalLinks(t){const view=t.final_report_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report`;const dl=t.final_report_download_url||`/api/v1/tasks/${encodeURIComponent(t.task_id)}/final-report/download`;return `<a target="_blank" href="${esc(view)}">Final</a><br><a target="_blank" href="${esc(dl)}">Download</a>`;}
+function reportLinks(item,gate){const url=item[`latest_${gate}_report_url`],dl=item[`latest_${gate}_download_url`];return url?`<span class="badge ${gate==='gate1'?'ok':'warn'}">${gate}</span> <a target="_blank" href="${esc(url)}">${t('link.view')}</a>/<a target="_blank" href="${esc(dl)}">${t('link.download')}</a><br>`:`<span class="badge">${gate}: -</span><br>`;}
+async function loadTasks(){const rows=filteredTasks();renderTaskStatusFilters();const visible=rows.filter(item=>state.statusFilter==='all'||taskState(item)===state.statusFilter);byId('tasksBody').innerHTML=visible.map(taskRowFull).join('')||`<tr><td colspan="10" class="muted">${t('message.noMatchingTasks')}</td></tr>`;byId('taskCards').innerHTML=visible.map(taskCard).join('')||`<div class="emptyState">${t('message.noMatchingTasks')}</div>`;byId('taskCount').textContent=visible.length;}
+function filteredTasks(){const p=byId('filterProduct').value,v=byId('filterVersion').value,tid=byId('filterTask').value;let rows=state.tasks;if(p)rows=rows.filter(item=>item.product_name===p);if(v)rows=rows.filter(item=>item.product_version===v);if(tid)rows=rows.filter(item=>item.task_id===tid);return rows;}
+const TASK_STATES=['running','approval','done','failed'];
+function taskState(item){const flow=item.flow_status||'',ag=item.auto_gate2||{},approval=item.approval||{};if(flow==='gate2_failed'||ag.status==='failed')return 'failed';if(flow==='completed_no_security_risk'||flow==='completed_gate2_approved'||(item.latest_gate2_review_id&&approval.gate2))return 'done';if(flow==='gate1_completed_pending_approval'||(item.latest_gate2_review_id&&!approval.gate2))return 'approval';return 'running';}
+function taskStages(item){const approval=item.approval||{},ag=item.auto_gate2||{},flow=item.flow_status||'';const noRisk=flow==='completed_no_security_risk'||item.final_result==='no_security_risk';const g1=item.latest_gate1_review_id,g2=item.latest_gate2_review_id;const steps=[];steps.push({key:'stage.gate1',state:g1?'done':'active'});steps.push({key:'stage.gate1Approval',state:approval.gate1?'done':g1?'active':'pending'});if(noRisk){steps.push({key:'stage.gate2',state:'skipped'});steps.push({key:'stage.gate2Approval',state:'skipped'});return steps;}steps.push({key:'stage.gate2',state:ag.status==='failed'||flow==='gate2_failed'?'failed':g2?'done':ACTIVE_AUTO_GATE2_STATUSES.has(ag.status)||flow==='gate2_running'?'active':'pending'});steps.push({key:'stage.gate2Approval',state:approval.gate2?'done':g2?'active':'pending'});return steps;}
+const STAGE_MARKS={done:'\u2713',failed:'\u2715',active:'\u25cf',skipped:'\u2013',pending:''};
+function stageFlowHtml(item){return `<div class="stageFlow">${taskStages(item).map((step,index)=>`<div class="stage" data-state="${step.state}"><span class="stageDot">${STAGE_MARKS[step.state]||index+1}</span><span class="stageLabel">${esc(t(step.key))}</span><span class="stageBar"></span></div>`).join('')}</div>`;}
+function reportLink(item,gate){const url=item[`latest_${gate}_report_url`];return url?`<span>${gate.toUpperCase()}: <a target="_blank" href="${esc(url)}">${t('link.view')}</a> / <a target="_blank" href="${esc(item[`latest_${gate}_download_url`]||'')}">${t('link.download')}</a></span>`:`<span class="muted">${gate.toUpperCase()}: —</span>`;}
+function taskCard(item){const st=taskState(item),ag=item.auto_gate2||{},approval=item.approval||{};const badge={running:'',approval:'warn',done:'ok',failed:'danger'}[st];const updated=item.updated_at||item.created_at||'';const error=ag.error&&st==='failed'?`<div class="taskCardError">${esc(ag.error)}</div>`:'';const actions=taskActions(item,approval,ag);return `<div class="taskCard" data-state="${st}" data-task-id="${esc(item.task_id)}"><div class="taskCardTop"><div class="taskCardTitle"><a href="#" onclick="selectTask('${esc(item.task_id)}');return false;" class="taskName">${esc(item.task_code||item.task_id)} · ${esc(item.task_name||'')}</a><span class="taskMeta">${esc(item.product_name||'')} ${esc(item.product_version||'')} · ${t('task.trigger')} ${esc(item.triggered_by||'-')} · ${esc(formatDateTime(updated))}</span></div><span class="badge ${badge}">${esc(t(`flow.${st}`))}</span></div>${stageFlowHtml(item)}${error}<div class="taskCardFoot"><div class="taskCardLinks">${reportLink(item,'gate1')}<span class="sep">|</span>${reportLink(item,'gate2')}<span class="sep">|</span><a target="_blank" href="${esc(item.final_report_url||`/api/v1/tasks/${encodeURIComponent(item.task_id)}/final-report`)}">${t('link.final')}</a></div>${actions==='-'?'':actions}</div></div>`;}
+function renderTaskStatusFilters(){const host=byId('taskStatusFilters');if(!host)return;const rows=filteredTasks(),counts=statusCounts(rows);host.innerHTML=[['all',rows.length],...TASK_STATES.map(key=>[key,counts[key]])].map(([key,count])=>`<button type="button" class="chip${state.statusFilter===key?' active':''}" data-state="${key}" onclick="setTaskStatusFilter('${key}')"><span class="chipDot"></span>${esc(t(key==='all'?'flow.all':`flow.${key}`))}<span class="chipCount">${count}</span></button>`).join('');}
+function statusCounts(rows){const counts=Object.fromEntries(TASK_STATES.map(key=>[key,0]));rows.forEach(item=>{counts[taskState(item)]+=1;});return counts;}
+function setTaskStatusFilter(key){state.statusFilter=key;loadTasks();}
+function autoGate2Cell(ag){const status=ag.status||'',badgeClass=status==='completed'?'ok':status==='failed'?'danger':ACTIVE_AUTO_GATE2_STATUSES.has(status)?'warn':'';const timestamp=ag.completed_at||ag.failed_at||ag.started_at||ag.queued_at||ag.triggered_at||'';const error=ag.error?`<br><span class="small errorText" title="${esc(ag.error)}">${esc(ag.error)}</span>`:'';const reviewId=ag.gate2_review_id||'';return `<span class="badge ${badgeClass}">${esc(status)}</span><br><span class="small muted">${esc(formatDateTime(timestamp))}</span><span class="small identifier" title="${esc(reviewId)}">${esc(reviewId)}</span>${error}`;}
+function taskActions(item,a,ag){let html='';if(item.latest_gate1_review_id&&!a.gate1)html+=`<button class="ok inline" onclick="approveReview('${esc(item.latest_gate1_review_id)}')">${t('action.approveGate1')}</button>`;if(item.latest_gate1_review_id&&ag.status==='failed')html+=`<button class="warn inline" onclick="approveReview('${esc(item.latest_gate1_review_id)}')">${t('action.retryGate2')}</button>`;if(item.latest_gate2_review_id&&!a.gate2)html+=`<button class="ok inline" onclick="approveReview('${esc(item.latest_gate2_review_id)}')">${t('action.approveGate2')}</button>`;if(item.latest_gate1_review_id)html+=`<button class="warn inline" onclick="sendReviewToJira('${esc(item.latest_gate1_review_id)}')">G1 → Jira</button>`;if(item.latest_gate2_review_id)html+=`<button class="warn inline" onclick="sendReviewToJira('${esc(item.latest_gate2_review_id)}')">G2 → Jira</button>`;if(taskState(item)==='done')html+=`<button class="warn inline" onclick="sendFinalReportToJira('${esc(item.task_id)}')">${t('action.finalToJira')}</button>`;return html?`<div class="tableActions">${html}</div>`:'-';}
+function taskRowFull(item){const a=item.approval||{},ag=item.auto_gate2||{},g1=item.latest_gate1_review_id||'',g2=item.latest_gate2_review_id||'';return `<tr><td><a href="#" onclick="selectTask('${esc(item.task_id)}');return false;"><b>${esc(item.task_code||item.task_id)}</b></a><br><span class="small muted">${t('task.started')} ${esc(formatDateTime(item.created_at||''))}</span></td><td>${esc(item.product_name)}<br>${esc(item.product_version)}</td><td><span title="${esc(item.task_name)}">${esc(item.task_name)}</span></td><td><b title="${esc(item.flow_status)}">${esc(item.flow_status)}</b><span class="muted small">${esc(item.final_result)}</span></td><td>${reportLinks(item,'gate1')}<span class="small identifier" title="${esc(g1)}">${esc(g1)}</span></td><td>${reportLinks(item,'gate2')}<span class="small identifier" title="${esc(g2)}">${esc(g2)}</span></td><td>${t('task.trigger')}: ${esc(item.triggered_by||'')}<br>G1: ${approvalText(a.gate1)}<br>G2: ${approvalText(a.gate2)}</td><td>${autoGate2Cell(ag)}</td><td>${finalLinks(item)}</td><td>${taskActions(item,a,ag)}</td></tr>`;}
+function finalLinks(item){const view=item.final_report_url||`/api/v1/tasks/${encodeURIComponent(item.task_id)}/final-report`;const dl=item.final_report_download_url||`/api/v1/tasks/${encodeURIComponent(item.task_id)}/final-report/download`;return `<a target="_blank" href="${esc(view)}">${t('link.final')}</a><br><a target="_blank" href="${esc(dl)}">${t('link.download')}</a>`;}
 function approvalText(x){return x?`${esc(x.approved_by)}<br><span class="small muted">${esc(formatDateTime(x.approved_at))}</span>`:'-';}
-function clearFilters(){byId('filterProduct').value='';byId('filterVersion').value='';byId('filterTask').value='';loadTasks();}
-function selectTask(id){state.selectedTask=id;fillReportTaskSelect();show('taskOut',{selected_task:id});}
-async function runGate1(){const body={project_id:byId('g1Project').value,product_name:byId('g1Product').value,product_version:byId('g1Version').value,repository:byId('g1Repo').value,branch:byId('g1Branch').value,documents:lines('g1Docs'),gate2_documents:lines('g1Gate2Docs'),threshold:Number(byId('g1Threshold').value),triggered_by:byId('g1TriggeredBy').value,auto_run_gate2_on_gate1_approval:true};const d=await fetchJson('/api/v1/ui/security-review/gate1/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});show('g1Out',d);await refreshAll();}
-async function runGate2(){const body={project_id:byId('g2Project').value,product_name:byId('g2Product').value,product_version:byId('g2Version').value,task_id:byId('g2TaskId').value||null,repository:byId('g2Repo').value,branch:byId('g2Branch').value,documents:lines('g2Docs'),threshold:Number(byId('g2Threshold').value),triggered_by:byId('g2TriggeredBy').value,gate1_report:byId('g2Gate1Report').value||null};const d=await fetchJson('/api/v1/ui/security-review/gate2/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});show('g2Out',d);await refreshAll();}
-async function approveReview(reviewId){const reviewer=byId('reviewer')?.value||'security.reviewer@example.com';const d=await fetchJson(`/api/v1/reports/${encodeURIComponent(reviewId)}/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer,comment:'Approved from UI'})});show('reportOut',d);await refreshAll();}
+function clearFilters(){byId('filterProduct').value='';byId('filterVersion').value='';byId('filterTask').value='';state.statusFilter='all';loadTasks();}
+function selectTask(id){state.selectedTask=id;fillReportTaskSelect();const item=state.tasks.find(task=>task.task_id===id);show('taskOut',t('message.taskSelected',{task:item?.task_code||id}));}
+function navButton(tabId){return [...document.querySelectorAll('.nav button')].find(button=>(button.getAttribute('onclick')||'').includes(`'${tabId}'`));}
+async function gotoTask(taskId){const button=navButton('taskList');if(button)showTab('taskList',button);if(!taskId)return;state.statusFilter='all';byId('filterProduct').value='';byId('filterVersion').value='';byId('filterTask').value='';await loadCatalog();selectTask(taskId);await loadTasks();const card=document.querySelector(`.taskCard[data-task-id="${CSS.escape(taskId)}"]`);if(!card)return;card.scrollIntoView({behavior:'smooth',block:'center'});card.classList.add('justCreated');setTimeout(()=>card.classList.remove('justCreated'),3000);}
+async function runGate1(){const gate1Input=selectedInputPayload('g1','g1Docs','g1Text','Gate1 Pasted Spec','g1Out','source.gate1');if(!gate1Input)return;const gate2Input=selectedInputPayload('g1Gate2','g1Gate2Docs','g1Gate2Text','Gate2 Pasted Spec for Auto-run','g1Out','source.autoGate2');if(!gate2Input)return;const body={project_id:byId('g1Project').value,product_name:byId('g1Product').value,product_version:byId('g1Version').value,repository:byId('g1Repo').value,branch:byId('g1Branch').value,documents:gate1Input.documents,document_texts:gate1Input.document_texts,gate2_documents:gate2Input.documents,gate2_document_texts:gate2Input.document_texts,knowledge_base_id:byId('g1Kb').value||'default',gate2_knowledge_base_id:byId('g1Gate2Kb').value||'default',threshold:Number(byId('g1Threshold').value),triggered_by:byId('g1TriggeredBy').value,auto_run_gate2_on_gate1_approval:true};const d=await guard(()=>fetchJson('/api/v1/ui/security-review/gate1/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),t('toast.failed'));show('g1Out',d);notify('ok',t('toast.gate1Done'),t('toast.taskCreated',{task:d.task_code||d.task_id||'',review:d.review_id||''}));await refreshAll();await gotoTask(d.task_id);}
+async function runGate2(){const gate2Input=selectedInputPayload('g2','g2Docs','g2Text','Gate2 Pasted Spec','g2Out','source.gate2');if(!gate2Input)return;const body={project_id:byId('g2Project').value,product_name:byId('g2Product').value,product_version:byId('g2Version').value,task_id:byId('g2TaskId').value||null,repository:byId('g2Repo').value,branch:byId('g2Branch').value,documents:gate2Input.documents,document_texts:gate2Input.document_texts,knowledge_base_id:byId('g2Kb').value||'default',threshold:Number(byId('g2Threshold').value),triggered_by:byId('g2TriggeredBy').value,gate1_report:byId('g2Gate1Report').value||null};const d=await guard(()=>fetchJson('/api/v1/ui/security-review/gate2/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),t('toast.failed'));show('g2Out',d);notify('ok',t('toast.gate2Done'),t('toast.taskCreated',{task:d.task_code||d.task_id||'',review:d.review_id||''}));await refreshAll();await gotoTask(d.task_id);}
+async function approveReview(reviewId){const reviewer=byId('reviewer')?.value||'security.reviewer@example.com';const d=await guard(()=>fetchJson(`/api/v1/reports/${encodeURIComponent(reviewId)}/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer,comment:'Approved from UI'})}),t('toast.failed'));show('reportOut',d);notify('ok',t('toast.approveDone'),t('toast.reviewRef',{review:reviewId}));setReportStatus('ok',t('toast.approveDone'),t('toast.reviewRef',{review:reviewId}));await loadCatalog();await Promise.all([loadStats(),loadTasks()]);updateWorkflowPolling();}
 async function onReportTaskChange(){const tid=byId('reportTask').value;if(!tid)return;state.selectedTask=tid;const t=state.tasks.find(x=>x.task_id===tid);const reviews=[];if(t?.latest_gate1_review_id)reviews.push({id:t.latest_gate1_review_id,label:`Gate1 - ${t.latest_gate1_review_id}`});if(t?.latest_gate2_review_id)reviews.push({id:t.latest_gate2_review_id,label:`Gate2 - ${t.latest_gate2_review_id}`});fillSelect('reportReview',reviews,state.selectedReview,r=>r.label,r=>r.id);onReviewSelect();}
-function onReviewSelect(){state.selectedReview=byId('reportReview').value;}
+function onReviewSelect(){state.selectedReview=byId('reportReview').value;renderReportTaskCard();}
+function renderReportTaskCard(){const host=byId('reportTaskCard');if(!host)return;const item=state.tasks.find(task=>task.task_id===state.selectedTask);host.innerHTML=item?taskCard(item):'';}
 function currentReview(){return byId('reportReview').value||state.selectedReview;}
-function openReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');window.open(`/api/v1/reports/${encodeURIComponent(id)}`,'_blank');}
-function downloadReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');window.open(`/api/v1/reports/${encodeURIComponent(id)}/download`,'_blank');}
-async function loadReportForEdit(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const r=await fetch(`/api/v1/reports/${encodeURIComponent(id)}`);byId('reportContent').value=await r.text();show('reportOut',r.ok?'Loaded.':'Failed.');}
-async function saveReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');const d=await fetchJson(`/api/v1/reports/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:byId('reportContent').value,reviewer:byId('reviewer').value,comment:'Manual update from UI'})});show('reportOut',d);await refreshAll();}
-async function approveSelectedReport(){const id=currentReview();if(!id)return show('reportOut','Select a review first.');await approveReview(id);}
-async function loadKb(){const gate=byId('kbGate').value;const d=await fetchJson(`/api/v1/knowledge-base/${gate}`);byId('kbContent').value=JSON.stringify(formatForDisplay(d),null,2);show('kbOut','Loaded.');}
-async function loadKbHistory(){const gate=byId('kbGate').value;show('kbOut',await fetchJson(`/api/v1/knowledge-base/${gate}/history`));}
-async function saveKb(){let content;try{content=JSON.parse(byId('kbContent').value);}catch(e){return show('kbOut','Invalid JSON: '+e.message)}const gate=byId('kbGate').value;show('kbOut',await fetchJson(`/api/v1/knowledge-base/${gate}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:byId('kbVersion').value,updated_by:byId('kbUpdatedBy').value,change_reason:byId('kbReason').value,content})}));}
-refreshAll().catch(e=>show('healthOut','Init failed: '+e.message));
+function openReport(){const id=currentReview();if(!id){notify('warn',t('message.selectReview'));return show('reportOut',t('message.selectReview'));}window.open(`/api/v1/reports/${encodeURIComponent(id)}`,'_blank');}
+function downloadReport(){const id=currentReview();if(!id){notify('warn',t('message.selectReview'));return show('reportOut',t('message.selectReview'));}window.open(`/api/v1/reports/${encodeURIComponent(id)}/download`,'_blank');}
+async function loadReportForEdit(){const id=currentReview();if(!id){notify('warn',t('message.selectReview'));return show('reportOut',t('message.selectReview'));}const r=await fetch(`/api/v1/reports/${encodeURIComponent(id)}`);byId('reportContent').value=await r.text();show('reportOut',t(r.ok?'message.loaded':'message.failed'));notify(r.ok?'ok':'error',t(r.ok?'message.loaded':'message.failed'),t('toast.reviewRef',{review:id}));setReportStatus(r.ok?'ok':'error',t(r.ok?'message.loaded':'message.failed'),t('toast.reviewRef',{review:id}));}
+async function saveReport(){const id=currentReview();if(!id){notify('warn',t('message.selectReview'));return show('reportOut',t('message.selectReview'));}const d=await guard(()=>fetchJson(`/api/v1/reports/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:byId('reportContent').value,reviewer:byId('reviewer').value,comment:'Manual update from UI'})}),t('toast.failed'));show('reportOut',d);notify('ok',t('toast.saveDone'),t('toast.reviewRef',{review:id}));setReportStatus('ok',t('toast.saveDone'),t('toast.reviewRef',{review:id}));await refreshAll();}
+async function approveSelectedReport(){const id=currentReview();if(!id){notify('warn',t('message.selectReview'));return show('reportOut',t('message.selectReview'));}await approveReview(id);}
+async function loadKb(){const gate=byId('kbGate').value,kbId=byId('kbId').value||'default';const d=await fetchJson(`/api/v1/knowledge-base/${gate}?knowledge_base_id=${encodeURIComponent(kbId)}`);byId('kbContent').value=JSON.stringify(formatForDisplay(d),null,2);show('kbOut',t('message.loaded'));}
+async function loadKbHistory(options={}){const gate=byId('kbGate').value,kbId=byId('kbId').value||'default',key=`${gate}:${kbId}`,panel=byId('kbHistoryPanel'),body=byId('kbHistoryBody'),requestId=++kbHistoryRequestId;state.kbHistoryLoading=true;panel.open=true;state.kbHistoryDetail=null;renderKbHistoryDetail();setKbHistoryStatus(t('message.loadingKbHistory'));if(body)body.innerHTML=`<tr><td colspan="6" class="muted">${t('message.loadingKbHistory')}</td></tr>`;try{const d=await fetchJson(`/api/v1/knowledge-base/${gate}/history?knowledge_base_id=${encodeURIComponent(kbId)}`);if(requestId!==kbHistoryRequestId||key!==selectedKbHistoryKey())return;state.kbHistory=d.items||[];state.kbHistoryLoadedKey=key;renderKbHistory();setKbHistoryStatus();}catch(e){if(requestId!==kbHistoryRequestId)return;state.kbHistory=[];state.kbHistoryLoadedKey='';renderKbHistory();setKbHistoryStatus(t('message.kbHistoryLoadFailed',{error:e.message}),true);}finally{if(requestId===kbHistoryRequestId)state.kbHistoryLoading=false;}if(options?.scroll!==false)panel.scrollIntoView({block:'nearest'});}
+async function saveKb(){let content;try{content=JSON.parse(byId('kbContent').value);}catch(e){return show('kbOut',t('message.invalidJson',{error:e.message}))}const gate=byId('kbGate').value,kbId=byId('kbId').value||'default';try{const saved=await fetchJson(`/api/v1/knowledge-base/${gate}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({knowledge_base_id:kbId,version:byId('kbVersion').value,updated_by:byId('kbUpdatedBy').value,change_reason:byId('kbReason').value,content})});show('kbOut',saved);await loadKbCatalog(gate);await loadKbHistory({scroll:false});}catch(e){show('kbOut',e.message);}}
+applyTranslations();
+initInputSources();
+refreshAll().catch(e=>show('healthOut',t('message.initFailed',{error:e.message})));
 </script>
 </body>
 </html>

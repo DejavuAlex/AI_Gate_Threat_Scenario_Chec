@@ -1,7 +1,10 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from backend.app import config
 from backend.app.main import app
+from backend.app.services import knowledge_base as knowledge_base_module
 
 
 client = TestClient(app)
@@ -53,3 +56,113 @@ def test_upload_spec_file_saves_under_specs_dir(tmp_path, monkeypatch):
     list_response = client.get("/api/v1/specs")
     assert list_response.status_code == 200
     assert list_response.json()["items"][0]["path"] == "specs/uploaded spec.md"
+
+
+def test_upload_and_select_classified_knowledge_base(tmp_path, monkeypatch):
+    kb_root = tmp_path / "knowledge_base"
+    history_root = tmp_path / "knowledge_base_history"
+    monkeypatch.setattr(knowledge_base_module, "KNOWLEDGE_BASE_DIR", kb_root)
+    monkeypatch.setattr(knowledge_base_module, "KB_HISTORY_DIR", history_root)
+    content = {
+        "schema_version": "1.0.0",
+        "knowledge_base_version": "0.1.0",
+        "gate": "Gate1",
+        "name": "Uploaded Cloud KB",
+        "scenarios": [
+            {
+                "id": "CLOUD-001",
+                "name": "Cloud Object Storage Upload",
+                "problem_scenario": "Does the service upload files to cloud storage?",
+                "category": "Cloud Service",
+                "risk": {"level": "Yellow"},
+                "risk_identification": ["Unsafe cloud object upload"],
+                "security_control_requirements": ["Validate object type"],
+            }
+        ],
+    }
+
+    response = client.post(
+        "/api/v1/knowledge-base/gate1/upload",
+        data={
+            "knowledge_base_id": "cloud-service",
+            "updated_by": "pytest@example.com",
+            "change_reason": "upload from test",
+            "version": "1.2.3",
+            "name": "Cloud Service KB",
+            "category": "Cloud Service",
+            "risk_level": "Yellow",
+            "description": "Cloud service golden KB",
+        },
+        files={"file": ("cloud.json", json.dumps(content).encode("utf-8"), "application/json")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["item"]["knowledge_base_id"] == "cloud-service"
+    assert body["item"]["category"] == "Cloud Service"
+    assert body["item"]["risk_level"] == "Yellow"
+
+    load_response = client.get("/api/v1/knowledge-base/gate1", params={"knowledge_base_id": "cloud-service"})
+    assert load_response.status_code == 200
+    loaded = load_response.json()
+    assert loaded["metadata"]["knowledge_base_id"] == "cloud-service"
+    assert loaded["knowledge_base_version"] == "1.2.3"
+
+    catalog_response = client.get("/api/v1/knowledge-base/gate1/catalog")
+    assert catalog_response.status_code == 200
+    assert catalog_response.json()["items"][0]["knowledge_base_id"] == "cloud-service"
+
+    history_response = client.get("/api/v1/knowledge-base/gate1/history", params={"knowledge_base_id": "cloud-service"})
+    assert history_response.status_code == 200
+    initial_history = history_response.json()["items"][0]
+    assert initial_history["knowledge_base_id"] == "cloud-service"
+    assert initial_history["change_summary"]["added_scenario_ids"] == ["CLOUD-001"]
+
+    loaded["scenarios"][0]["risk"]["level"] = "Red"
+    update_response = client.put(
+        "/api/v1/knowledge-base/gate1",
+        json={
+            "knowledge_base_id": "cloud-service",
+            "version": "1.2.4",
+            "updated_by": "reviewer@example.com",
+            "change_reason": "clarify cloud upload scenario",
+            "content": loaded,
+        },
+    )
+    assert update_response.status_code == 200
+
+    updated_history_response = client.get(
+        "/api/v1/knowledge-base/gate1/history",
+        params={"knowledge_base_id": "cloud-service"},
+    )
+    assert updated_history_response.status_code == 200
+    updated_history = updated_history_response.json()["items"][0]
+    assert updated_history["previous_version"] == "1.2.3"
+    assert updated_history["version"] == "1.2.4"
+    assert updated_history["change_summary"]["modified_scenario_ids"] == ["CLOUD-001"]
+    assert "knowledge_base_version" in updated_history["change_summary"]["changed_fields"]
+    listed_field_changes = updated_history["change_summary"]["field_changes"]
+    risk_change = next(
+        change for change in listed_field_changes
+        if change["path"] == "scenarios[CLOUD-001].risk.level"
+    )
+    assert risk_change["change_type"] == "modified"
+    assert risk_change["scenario_id"] == "CLOUD-001"
+    assert risk_change["field"] == "risk.level"
+    assert "previous_value" not in risk_change
+    assert "new_value" not in risk_change
+
+    detail_response = client.get(
+        f"/api/v1/knowledge-base/gate1/history/{updated_history['history_id']}"
+    )
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["change_reason"] == "clarify cloud upload scenario"
+    detailed_risk_change = next(
+        change for change in detail["change_summary"]["field_changes"]
+        if change["path"] == "scenarios[CLOUD-001].risk.level"
+    )
+    assert detailed_risk_change["previous_value"] == "Yellow"
+    assert detailed_risk_change["new_value"] == "Red"
+    assert detail["previous_snapshot"]["scenarios"][0]["risk"]["level"] == "Yellow"
+    assert detail["new_snapshot"]["scenarios"][0]["risk"]["level"] == "Red"

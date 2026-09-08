@@ -2,6 +2,7 @@ from typing import Any
 
 from ..config import UNMATCHED_MESSAGE
 from .llm_client import LLMClient
+from .matching import MatchingEngine, extract_positive_scenario_quotes
 
 
 SYSTEM_PROMPT = """
@@ -18,8 +19,14 @@ Strict rules:
 3. Do not force a match. If evidence is insufficient or below threshold, return
    matched=false and no matched_scenarios.
 4. Only return scenario IDs that exist in candidate_scenarios.
-5. A match must be supported by concrete evidence from the documents.
-6. Keep the output as a single JSON object.
+5. A match must be supported by concrete, positive evidence from the documents.
+6. Every matched_evidence item must be an exact quote copied from a document.
+    Never paraphrase, translate, combine separate lines, or invent a quote.
+7. Text in a Non-goals/非目标/Out of scope section and locally negated text
+    such as "does not support" or "不支持" are negative evidence, not matches.
+8. A generic token such as schema, OAuth, SSO, token, or GET is insufficient
+    without the scenario-specific context declared in match_context.
+9. Keep the output as a single JSON object.
 
 Required output schema:
 {
@@ -63,52 +70,88 @@ class LLMMatchingService:
             "business_indicators": scenario.get("business_indicators", []),
             "technical_indicators": scenario.get("technical_indicators", []),
             "negative_indicators": scenario.get("negative_indicators", []),
+            "match_context": scenario.get("match_context", {}),
             "risk_identification": scenario.get("risk_identification", []),
             "security_control_requirements": scenario.get("security_control_requirements", []),
         }
 
     @staticmethod
-    def _merge_llm_result(kb: dict[str, Any], base_result: dict[str, Any], llm_result: dict[str, Any], threshold: float) -> dict[str, Any]:
+    def _merge_llm_result(
+        kb: dict[str, Any],
+        base_result: dict[str, Any],
+        llm_result: dict[str, Any],
+        threshold: float,
+        gate: str,
+        document_text: str,
+    ) -> dict[str, Any]:
         scenarios_by_id = {item.get("id"): item for item in kb.get("scenarios", [])}
         merged_by_id: dict[str, dict[str, Any]] = {
             item["scenario"].get("id"): item for item in base_result.get("matched_scenarios", [])
         }
+        engine = MatchingEngine(kb, threshold)
+        rejected_count = 0
 
         for llm_item in llm_result.get("matched_scenarios", []) or []:
             scenario_id = llm_item.get("scenario_id")
             if scenario_id not in scenarios_by_id:
+                rejected_count += 1
                 continue
             try:
                 llm_confidence = float(llm_item.get("llm_confidence", 0))
             except (TypeError, ValueError):
                 llm_confidence = 0.0
             llm_confidence = max(0.0, min(1.0, llm_confidence))
-            if llm_confidence < threshold:
+            if llm_confidence <= 0.0:
+                rejected_count += 1
                 continue
 
             scenario = scenarios_by_id[scenario_id]
+            raw_evidence = llm_item.get("matched_evidence", [])
+            if isinstance(raw_evidence, str):
+                raw_evidence = [raw_evidence]
+            verified_evidence = []
+            for quote in raw_evidence[:10]:
+                if isinstance(quote, str):
+                    verified_evidence.extend(extract_positive_scenario_quotes(document_text, quote, scenario))
+            verified_evidence = list(dict.fromkeys(verified_evidence))
+            if not verified_evidence:
+                rejected_count += 1
+                continue
+
+            scored = engine.score_scenario(document_text, scenario, gate)
+            if not scored.matched_evidence:
+                rejected_count += 1
+                continue
             base_item = merged_by_id.get(scenario_id)
+            score_breakdown = dict(base_item.get("score_breakdown", {}) if base_item else scored.score_breakdown)
+            score_breakdown["llm_confidence"] = round(llm_confidence, 4)
+            final_score = engine.recalculate_score(score_breakdown, gate)
+            if final_score < threshold and base_item is None:
+                rejected_count += 1
+                continue
+
             if base_item:
-                base_item.setdefault("matched_evidence", [])
-                base_item["matched_evidence"].extend(llm_item.get("matched_evidence", [])[:5])
+                base_item["matched_evidence"] = list(dict.fromkeys(
+                    list(base_item.get("matched_evidence", [])) + verified_evidence[:5]
+                ))
                 base_item["matched_reason"] = llm_item.get("matched_reason", "")
-                base_item["optimized_security_controls"] = llm_item.get("optimized_security_controls", [])
-                base_item["score_breakdown"]["llm_confidence"] = round(llm_confidence, 4)
-                base_item["final_score"] = round(max(base_item.get("final_score", 0), llm_confidence), 4)
+                controls = llm_item.get("optimized_security_controls", [])
+                base_item["optimized_security_controls"] = controls[:10] if isinstance(controls, list) else []
+                base_item["score_breakdown"] = score_breakdown
+                base_item["final_score"] = final_score
             else:
                 merged_by_id[scenario_id] = {
                     "scenario": scenario,
-                    "final_score": round(llm_confidence, 4),
-                    "score_breakdown": {
-                        "semantic_similarity": 0.0,
-                        "keyword_match": 0.0,
-                        "context": 0.0,
-                        "negative_evidence_adjustment": 1.0,
-                        "llm_confidence": round(llm_confidence, 4),
-                    },
-                    "matched_evidence": llm_item.get("matched_evidence", [])[:10],
+                    "final_score": final_score,
+                    "score_breakdown": score_breakdown,
+                    "matched_evidence": list(dict.fromkeys(scored.matched_evidence + verified_evidence))[:10],
+                    "negative_evidence": scored.negative_evidence,
                     "matched_reason": llm_item.get("matched_reason", ""),
-                    "optimized_security_controls": llm_item.get("optimized_security_controls", []),
+                    "optimized_security_controls": (
+                        llm_item.get("optimized_security_controls", [])[:10]
+                        if isinstance(llm_item.get("optimized_security_controls", []), list)
+                        else []
+                    ),
                 }
 
         merged = list(merged_by_id.values())
@@ -118,6 +161,7 @@ class LLMMatchingService:
             "matched_scenarios": merged,
             "unmatched_message": None if merged else kb.get("matching_policy", {}).get("unmatched_message", UNMATCHED_MESSAGE),
             "llm_enabled": True,
+            "llm_rejected_match_count": rejected_count,
         }
 
     def enhance_matches(
@@ -161,6 +205,6 @@ class LLMMatchingService:
             base_result["llm_error"] = str(exc)
             return base_result
 
-        merged = self._merge_llm_result(kb, base_result, llm_result, threshold)
+        merged = self._merge_llm_result(kb, base_result, llm_result, threshold, gate, document_text)
         merged["llm_raw_result"] = llm_result
         return merged

@@ -6,10 +6,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTT
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from . import config
-from .schemas import ApproveRequest, JiraSendRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
+from .schemas import ApproveRequest, JiraSendRequest, KnowledgeBaseAssistantRequest, KnowledgeBaseUpdateRequest, ReportUpdateRequest, ReviewRunRequest
 from .services import jira as jira_service
 from .services import report_generator
 from .services.knowledge_base import KnowledgeBaseService
+from .services.knowledge_base_assistant import KnowledgeBaseAssistantService
 from .services.review import ReviewService
 
 
@@ -36,6 +37,7 @@ def require_external_api_key(
 router = APIRouter()
 review_service = ReviewService()
 kb_service = KnowledgeBaseService()
+kb_assistant_service = KnowledgeBaseAssistantService()
 
 ALLOWED_SPEC_EXTENSIONS = {".md", ".markdown", ".txt", ".json", ".yaml", ".yml"}
 MAX_SPEC_FILE_SIZE = 10 * 1024 * 1024
@@ -459,6 +461,29 @@ async def upload_knowledge_base(
         raise HTTPException(status_code=400, detail=str(exc))
     finally:
         await file.close()
+
+
+@router.post("/knowledge-base/{gate}/assistant/propose")
+def propose_knowledge_base_scenario(gate: str, request: KnowledgeBaseAssistantRequest):
+    try:
+        knowledge_base = kb_service.load(gate, request.knowledge_base_id)
+        return kb_assistant_service.propose(
+            gate,
+            knowledge_base,
+            request.message,
+            conversation=[item.model_dump() for item in request.conversation],
+            draft_scenario=request.draft_scenario,
+            draft_action=request.draft_action,
+            draft_matched_scenario_id=request.draft_matched_scenario_id,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"assistant generation failed: {exc}")
 
 
 @router.get("/knowledge-base/{gate}")

@@ -55,6 +55,20 @@ class KnowledgeBaseUpdateRequest(BaseModel):
     content: dict[str, Any]
 
 
+class KnowledgeBaseAssistantMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class KnowledgeBaseAssistantRequest(BaseModel):
+    knowledge_base_id: str = "default"
+    message: str = Field(min_length=1, max_length=6000)
+    conversation: list[KnowledgeBaseAssistantMessage] = Field(default_factory=list, max_length=10)
+    draft_scenario: dict[str, Any] | None = None
+    draft_action: Literal["add", "update"] | None = None
+    draft_matched_scenario_id: str | None = None
+
+
 class MatchedScenario(BaseModel):
     scenario_id: str
     scenario_name: str

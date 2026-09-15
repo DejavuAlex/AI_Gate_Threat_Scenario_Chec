@@ -270,6 +270,7 @@ curl -OJ "http://localhost:18080/api/v1/tasks/TASK-000001/final-report/download"
 GET /api/v1/knowledge-base/{gate}
 PUT /api/v1/knowledge-base/{gate}
 GET /api/v1/knowledge-base/{gate}/history
+POST /api/v1/knowledge-base/{gate}/assistant/propose
 ```
 
 每次人工更新知识库都会保存历史记录：
@@ -277,3 +278,23 @@ GET /api/v1/knowledge-base/{gate}/history
 ```text
 data/knowledge_base_history/{gate}/
 ```
+
+### 金标准场景对话助手
+
+助手读取所选知识库的 Scenario 格式和已有场景，返回一条可编辑候选。`S` 在知识库 JSON 中沿用现有字段名 `severity`。该接口只生成候选，不写文件；用户确认后仍需调用 `PUT /api/v1/knowledge-base/{gate}` 才会同步并生成变更记录。
+
+```http
+POST /api/v1/knowledge-base/gate1/assistant/propose
+Content-Type: application/json
+
+{
+  "knowledge_base_id": "default",
+  "message": "外部用户可以上传医学影像，并通过临时链接分享给医生",
+  "conversation": [],
+  "draft_scenario": null,
+  "draft_action": null,
+  "draft_matched_scenario_id": null
+}
+```
+
+响应包含 `action`、匹配或参考的已有场景 ID、完整 `scenario` 候选和便于 UI 展示的风险摘要，其中 `risk_summary.S` 对应 `scenario.risk.severity`。

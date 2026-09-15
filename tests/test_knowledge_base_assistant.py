@@ -34,13 +34,16 @@ class FakeLLMClient:
         return True
 
     def complete_json(self, system_prompt, payload):
+        serialized_payload = json.dumps(payload, ensure_ascii=False)
         assert "severity" in system_prompt
+        assert "own cybersecurity" in system_prompt
         assert payload["scenario_description"] == "Users can share external links"
+        assert set(payload) == {"gate", "scenario_description", "conversation", "current_draft", "scenario_schema"}
+        assert "Existing upload scenario" not in serialized_payload
+        assert "TEST-001" not in serialized_payload
+        assert "Malicious file upload" not in serialized_payload
         return {
-            "assistant_message": "Use P=4 and S=7 based on the closest scenarios.",
-            "action": "add",
-            "matched_scenario_id": None,
-            "reference_scenario_ids": ["TEST-001", "DOES-NOT-EXIST"],
+            "assistant_message": "My independent assessment is P=4 and S=7.",
             "scenario": {
                 "name": "External link sharing",
                 "problem_scenario": "Can users share external links?",
@@ -67,14 +70,15 @@ class PartialRevisionLLMClient:
         }
 
 
-class MissingActionLLMClient(FakeLLMClient):
+class UpdateAttemptLLMClient(FakeLLMClient):
     def complete_json(self, system_prompt, payload):
         result = super().complete_json(system_prompt, payload)
-        result.pop("action")
+        result["action"] = "update"
+        result["matched_scenario_id"] = "TEST-001"
         return result
 
 
-def test_assistant_proposal_matches_selected_kb_shape_and_exposes_p_s_values():
+def test_assistant_uses_own_knowledge_and_matches_only_the_kb_field_shape():
     service = KnowledgeBaseAssistantService(client=FakeLLMClient())
 
     result = service.propose("gate1", sample_knowledge_base(), "Users can share external links")
@@ -83,7 +87,7 @@ def test_assistant_proposal_matches_selected_kb_shape_and_exposes_p_s_values():
     assert result["scenario"]["id"] == "TEST-002"
     assert set(result["scenario"]) == set(sample_knowledge_base()["scenarios"][0])
     assert result["risk_summary"] == {"P1": 7, "P2": 6, "P": 4, "S": 7, "level": "Yellow"}
-    assert result["reference_scenario_ids"] == ["TEST-001"]
+    assert result["reference_scenario_ids"] == []
 
 
 def test_assistant_merges_partial_follow_up_into_the_edited_draft():
@@ -105,15 +109,14 @@ def test_assistant_merges_partial_follow_up_into_the_edited_draft():
     assert revised["scenario"]["name"] == "External link sharing"
 
 
-def test_assistant_requires_an_explicit_action_on_the_first_turn():
-    service = KnowledgeBaseAssistantService(client=MissingActionLLMClient())
+def test_assistant_always_creates_a_new_candidate_even_if_the_model_requests_an_update():
+    service = KnowledgeBaseAssistantService(client=UpdateAttemptLLMClient())
 
-    try:
-        service.propose("gate1", sample_knowledge_base(), "Users can share external links")
-    except ValueError as exc:
-        assert str(exc) == "assistant response action must be add or update"
-    else:
-        raise AssertionError("missing first-turn action must be rejected")
+    result = service.propose("gate1", sample_knowledge_base(), "Users can share external links")
+
+    assert result["action"] == "add"
+    assert result["matched_scenario_id"] is None
+    assert result["scenario"]["id"] == "TEST-002"
 
 
 def test_assistant_endpoint_only_proposes_and_does_not_write_kb(tmp_path, monkeypatch):

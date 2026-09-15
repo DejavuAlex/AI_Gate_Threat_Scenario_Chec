@@ -11,3 +11,5 @@ def test_golden_kb_assistant_ui_keeps_generation_and_sync_as_separate_actions():
     assert "/assistant/propose" in html
     assert "onclick=\"saveKb()\"" in html
     assert "Confirm & Sync KB" in html
+    assert "AI 基于自身安全知识独立生成" in html
+    assert "AI 将参考当前知识库生成" not in html

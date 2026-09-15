@@ -281,7 +281,7 @@ data/knowledge_base_history/{gate}/
 
 ### 金标准场景对话助手
 
-助手读取所选知识库的 Scenario 格式和已有场景，返回一条可编辑候选。`S` 在知识库 JSON 中沿用现有字段名 `severity`。该接口只生成候选，不写文件；用户确认后仍需调用 `PUT /api/v1/knowledge-base/{gate}` 才会同步并生成变更记录。
+助手要求 LLM 使用自身安全知识独立生成一条可编辑的新候选。现有知识库的名称、版本、示例和场景内容均不会发送给 LLM；它们仅在服务端用于字段校验和新 Scenario ID 防冲突。`S` 在知识库 JSON 中沿用现有字段名 `severity`。该接口只生成候选，不写文件；用户确认后仍需调用 `PUT /api/v1/knowledge-base/{gate}` 才会同步并生成变更记录。
 
 ```http
 POST /api/v1/knowledge-base/gate1/assistant/propose
@@ -297,4 +297,4 @@ Content-Type: application/json
 }
 ```
 
-响应包含 `action`、匹配或参考的已有场景 ID、完整 `scenario` 候选和便于 UI 展示的风险摘要，其中 `risk_summary.S` 对应 `scenario.risk.severity`。
+响应固定使用 `action: "add"`，不匹配或引用已有场景，并包含完整 `scenario` 候选和便于 UI 展示的风险摘要，其中 `risk_summary.S` 对应 `scenario.risk.severity`。
